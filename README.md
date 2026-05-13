@@ -20,11 +20,11 @@ Current scope:
 
 - FastAPI application using a `src/` layout
 - health endpoint for service checks
-- test coverage for the health endpoint
+- Basic Auth validation endpoint against the OpenSVC Collector
+- test coverage for the health and auth endpoints
 
 Planned scope:
 
-- validate user Basic Auth against the OpenSVC Collector
 - connect to the OpenSVC Collector MCP server with the same user credentials
 - expose controlled backend endpoints for MCP access
 - avoid storing user passwords beyond the current request/session boundary
@@ -53,6 +53,36 @@ Expected response:
 
 ```json
 {"status":"ok"}
+```
+
+
+## Auth Check
+
+The gateway validates user Basic Auth against the Collector REST API before MCP
+access is attempted.
+
+Required environment:
+
+```bash
+export OPENSVC_COLLECTOR_API_BASE_URL=https://collector-host/init/rest/api
+```
+
+For local Collectors using self-signed TLS certificates:
+
+```bash
+export OPENSVC_COLLECTOR_TLS_VERIFY=false
+```
+
+Check credentials:
+
+```bash
+curl -u user:password http://127.0.0.1:8010/api/v1/auth/check
+```
+
+Expected response:
+
+```json
+{"authenticated":true,"username":"user"}
 ```
 
 ## Tests
