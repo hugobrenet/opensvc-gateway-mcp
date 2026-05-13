@@ -21,13 +21,14 @@ Current scope:
 - FastAPI application using a `src/` layout
 - health endpoint for service checks
 - Basic Auth validation endpoint against the OpenSVC Collector
-- test coverage for the health and auth endpoints
+- internal gateway session endpoints for Collector backend integration
+- test coverage for the health, auth, and internal session endpoints
 
 Planned scope:
 
 - connect to the OpenSVC Collector MCP server with the same user credentials
 - expose controlled backend endpoints for MCP access
-- avoid storing user passwords beyond the current request/session boundary
+- move from in-memory sessions to Redis or another shared store for production
 
 ## Run
 
@@ -83,6 +84,44 @@ Expected response:
 
 ```json
 {"authenticated":true,"username":"user"}
+```
+
+
+## Internal Sessions
+
+Collector can create a short-lived gateway session after a successful login.
+This endpoint is intended for backend-to-backend calls only and requires a shared
+internal token.
+
+Required environment:
+
+```bash
+export OPENSVC_GATEWAY_INTERNAL_TOKEN=change-me
+```
+
+Create a gateway session:
+
+```bash
+curl -X POST http://127.0.0.1:8010/internal/v1/sessions \
+  -H 'X-OpenSVC-Gateway-Token: change-me' \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"user","password":"password","ttl_seconds":1800}'
+```
+
+Expected response:
+
+```json
+{"session_id":"...","username":"user","expires_at":"..."}
+```
+
+The optional `ttl_seconds` field lets the Collector align the gateway session
+expiration with its own web session expiration.
+
+Delete a gateway session:
+
+```bash
+curl -X DELETE http://127.0.0.1:8010/internal/v1/sessions/<session_id> \
+  -H 'X-OpenSVC-Gateway-Token: change-me'
 ```
 
 ## Tests

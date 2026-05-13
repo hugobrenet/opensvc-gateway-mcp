@@ -28,6 +28,21 @@ class Settings(BaseSettings):
         ),
     )
 
+    gateway_internal_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "OPENSVC_GATEWAY_INTERNAL_TOKEN",
+            "GATEWAY_INTERNAL_TOKEN",
+        ),
+    )
+    gateway_session_ttl_seconds: int = Field(
+        default=1800,
+        validation_alias=AliasChoices(
+            "OPENSVC_GATEWAY_SESSION_TTL_SECONDS",
+            "GATEWAY_SESSION_TTL_SECONDS",
+        ),
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
