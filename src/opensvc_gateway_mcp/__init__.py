@@ -1,0 +1,1 @@
+"""OpenSVC MCP gateway package."""
