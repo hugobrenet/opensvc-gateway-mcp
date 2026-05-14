@@ -24,6 +24,10 @@ class McpHttpError(McpClientError):
         super().__init__(f"MCP HTTP request failed with status {status_code}")
 
 
+class McpTransportError(McpClientError):
+    """The MCP endpoint could not be reached or timed out."""
+
+
 class McpJsonRpcError(McpClientError):
     """The MCP endpoint returned a JSON-RPC error."""
 
@@ -195,12 +199,17 @@ class McpClient:
             timeout=self.settings.mcp_request_timeout_seconds,
             transport=self.transport,
         ) as client:
-            response = await client.post(
-                self.settings.mcp_url,
-                json=payload,
-                headers=headers,
-                auth=(credentials.username, credentials.password),
-            )
+            try:
+                response = await client.post(
+                    self.settings.mcp_url,
+                    json=payload,
+                    headers=headers,
+                    auth=(credentials.username, credentials.password),
+                )
+            except httpx.HTTPError as exc:
+                raise McpTransportError(
+                    f"MCP HTTP request failed: {type(exc).__name__}"
+                ) from exc
 
         if response.status_code >= 400:
             try:

@@ -152,6 +152,15 @@ curl -X POST http://127.0.0.1:8010/api/v1/mcp/tools/search \
   -d '{"query":"node inventory statistics summary distribution"}'
 ```
 
+Call one of the Collector MCP tools returned by search:
+
+```bash
+curl -X POST http://127.0.0.1:8010/api/v1/mcp/tools/call \
+  -H 'X-OpenSVC-AI-Session: <session_id>' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"get_nodes_inventory_stats","arguments":{"request":{}}}'
+```
+
 ## Tests
 
 ```bash

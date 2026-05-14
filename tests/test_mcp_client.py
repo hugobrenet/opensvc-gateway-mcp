@@ -6,7 +6,11 @@ import httpx
 import pytest
 from fastapi.security import HTTPBasicCredentials
 
-from opensvc_gateway_mcp.clients.mcp import McpClient, McpJsonRpcError
+from opensvc_gateway_mcp.clients.mcp import (
+    McpClient,
+    McpJsonRpcError,
+    McpTransportError,
+)
 from opensvc_gateway_mcp.config import Settings
 
 
@@ -196,4 +200,17 @@ def test_mcp_client_raises_json_rpc_error_without_exposing_credentials():
 
     assert exc_info.value.code == -32001
     assert str(exc_info.value) == "Collector authentication failed"
+    assert "secret" not in str(exc_info.value)
+
+
+def test_mcp_client_wraps_httpx_transport_errors_without_exposing_credentials():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    client = McpClient(_settings(), transport=httpx.MockTransport(handler))
+
+    with pytest.raises(McpTransportError) as exc_info:
+        asyncio.run(client.initialize(_credentials()))
+
+    assert "ReadTimeout" in str(exc_info.value)
     assert "secret" not in str(exc_info.value)

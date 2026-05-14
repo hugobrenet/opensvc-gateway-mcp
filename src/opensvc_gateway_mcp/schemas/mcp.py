@@ -7,5 +7,6 @@ class SearchMcpToolsRequest(BaseModel):
     query: str = Field(min_length=1)
 
 
-class McpToolCallResult(BaseModel):
-    result: dict[str, Any]
+class CallMcpToolRequest(BaseModel):
+    name: str = Field(min_length=1)
+    arguments: dict[str, Any] = Field(default_factory=dict)
