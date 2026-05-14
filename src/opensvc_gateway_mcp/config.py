@@ -43,6 +43,21 @@ class Settings(BaseSettings):
         ),
     )
 
+    mcp_url: str = Field(
+        default="http://127.0.0.1:8001/mcp",
+        validation_alias=AliasChoices(
+            "OPENSVC_MCP_URL",
+            "MCP_URL",
+        ),
+    )
+    mcp_request_timeout_seconds: float = Field(
+        default=10.0,
+        validation_alias=AliasChoices(
+            "OPENSVC_MCP_REQUEST_TIMEOUT_SECONDS",
+            "MCP_REQUEST_TIMEOUT_SECONDS",
+        ),
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:

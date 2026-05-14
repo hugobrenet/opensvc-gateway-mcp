@@ -124,6 +124,18 @@ curl -X DELETE http://127.0.0.1:8010/internal/v1/sessions/<session_id> \
   -H 'X-OpenSVC-Gateway-Token: change-me'
 ```
 
+## MCP Client
+
+The gateway can call the Collector MCP server with credentials recovered from a
+gateway session. The MCP server still validates Basic Auth itself.
+
+Optional environment:
+
+```bash
+export OPENSVC_MCP_URL=http://127.0.0.1:8001/mcp
+export OPENSVC_MCP_REQUEST_TIMEOUT_SECONDS=10
+```
+
 ## Tests
 
 ```bash
