@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from functools import lru_cache
 
 from opensvc_gateway_mcp.clients.collector import CollectorClient
@@ -12,6 +13,10 @@ def get_collector_client() -> CollectorClient:
 
 def get_mcp_client() -> McpClient:
     return McpClient(get_settings())
+
+
+def get_mcp_client_provider() -> Callable[[], McpClient]:
+    return get_mcp_client
 
 
 @lru_cache

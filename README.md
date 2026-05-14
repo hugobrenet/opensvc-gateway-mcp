@@ -136,6 +136,13 @@ export OPENSVC_MCP_URL=http://127.0.0.1:8001/mcp
 export OPENSVC_MCP_REQUEST_TIMEOUT_SECONDS=10
 ```
 
+List the MCP tools visible through the gateway session:
+
+```bash
+curl http://127.0.0.1:8010/api/v1/mcp/tools \
+  -H 'X-OpenSVC-AI-Session: <session_id>'
+```
+
 ## Tests
 
 ```bash
