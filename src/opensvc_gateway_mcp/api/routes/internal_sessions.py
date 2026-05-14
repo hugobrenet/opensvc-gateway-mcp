@@ -49,7 +49,7 @@ async def create_gateway_session(
 ) -> GatewaySessionResponse:
     credentials = HTTPBasicCredentials(
         username=request.username,
-        password=request.password,
+        password=request.password.get_secret_value(),
     )
     try:
         principal = await collector.get_self(credentials)

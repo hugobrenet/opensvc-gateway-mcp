@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from opensvc_gateway_mcp.api.dependencies import (
     get_collector_client,
@@ -77,7 +78,8 @@ def test_internal_session_validates_collector_credentials_and_stores_session():
     stored = store.get(payload["session_id"])
     assert stored is not None
     assert stored.username == "user-a"
-    assert stored.password == "secret"
+    assert stored.password.get_secret_value() == "secret"
+    assert "secret" not in repr(stored)
 
 
 def test_internal_session_rejects_invalid_collector_credentials():
@@ -134,7 +136,11 @@ def test_internal_session_accepts_requested_ttl():
 def test_internal_session_delete_removes_session():
     app = create_app()
     store = InMemoryGatewaySessionStore()
-    session = store.create(username="user-a", password="secret", ttl_seconds=60)
+    session = store.create(
+        username="user-a",
+        password=SecretStr("secret"),
+        ttl_seconds=60,
+    )
     app.dependency_overrides[get_settings] = lambda: Settings(
         OPENSVC_COLLECTOR_API_BASE_URL="https://collector.invalid/init/rest/api",
         OPENSVC_GATEWAY_INTERNAL_TOKEN="expected-token",

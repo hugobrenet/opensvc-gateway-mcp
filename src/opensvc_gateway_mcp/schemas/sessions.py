@@ -1,11 +1,11 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 
 class CreateGatewaySessionRequest(BaseModel):
     username: str
-    password: str
+    password: SecretStr
     ttl_seconds: int | None = Field(default=None, ge=1)
 
 
