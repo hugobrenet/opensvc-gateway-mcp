@@ -143,6 +143,15 @@ curl http://127.0.0.1:8010/api/v1/mcp/tools \
   -H 'X-OpenSVC-AI-Session: <session_id>'
 ```
 
+Search the underlying Collector MCP tool catalog:
+
+```bash
+curl -X POST http://127.0.0.1:8010/api/v1/mcp/tools/search \
+  -H 'X-OpenSVC-AI-Session: <session_id>' \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"node inventory statistics summary distribution"}'
+```
+
 ## Tests
 
 ```bash
