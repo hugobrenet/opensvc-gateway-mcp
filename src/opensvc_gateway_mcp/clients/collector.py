@@ -5,6 +5,7 @@ import httpx
 from fastapi.security import HTTPBasicCredentials
 
 from opensvc_gateway_mcp.config import Settings
+from opensvc_gateway_mcp.schemas.ai import LlmProfile
 
 
 class InvalidCollectorCredentials(Exception):
@@ -39,6 +40,16 @@ class CollectorClient:
             username=_extract_username(payload) or credentials.username,
             raw=payload,
         )
+
+    async def get_ai_config(
+        self,
+        credentials: HTTPBasicCredentials,
+    ) -> LlmProfile:
+        response = await self._get(
+            self.settings.collector_ai_config_path,
+            credentials=credentials,
+        )
+        return LlmProfile.model_validate(_unwrap_config_payload(response.json()))
 
     async def _get(
         self,
@@ -92,3 +103,11 @@ def _extract_username(payload: dict[str, Any]) -> str | None:
                     return value
 
     return None
+
+
+def _unwrap_config_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    for key in ("config", "llm", "data"):
+        value = payload.get(key)
+        if isinstance(value, dict):
+            return value
+    return payload

@@ -161,6 +161,59 @@ curl -X POST http://127.0.0.1:8010/api/v1/mcp/tools/call \
   -d '{"name":"get_nodes_inventory_stats","arguments":{"request":{}}}'
 ```
 
+## AI Chat Orchestration
+
+The gateway can orchestrate an OpenAI-compatible LLM with the Collector MCP
+server. The Collector remains the source of truth for the LLM profile and system
+prompt.
+
+Expected flow:
+
+```text
+client -> gateway /api/v1/ai/chat
+  -> Collector REST: fetch LLM profile and system prompt
+  -> MCP tools/list: expose only search_tools and call_tool to the LLM
+  -> LLM /chat/completions
+  -> MCP tool calls requested by the LLM
+  -> LLM final answer
+```
+
+Collector AI configuration endpoint:
+
+```bash
+export OPENSVC_COLLECTOR_AI_CONFIG_PATH=/ai/llm/config
+```
+
+The endpoint is called with the user credentials stored in the gateway session
+and should return either the profile directly or under `config`, `llm`, or
+`data`:
+
+```json
+{
+  "provider": "openai_compatible",
+  "base_url": "http://127.0.0.1:11434/v1",
+  "model": "qwen3:8b",
+  "api_key": "ollama",
+  "system_prompt": "You are the OpenSVC assistant. Use MCP tools when needed.",
+  "temperature": 0.2,
+  "max_tool_iterations": 5,
+  "tool_result_max_chars": 20000
+}
+```
+
+Call the orchestrator:
+
+```bash
+curl -X POST http://127.0.0.1:8010/api/v1/ai/chat \
+  -H 'X-OpenSVC-AI-Session: <session_id>' \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"How many nodes are down?"}'
+```
+
+The LLM only sees the two MCP proxy tools, `search_tools` and `call_tool`. It
+must search the tool catalog first, then call a selected Collector tool through
+the proxy.
+
 ## Tests
 
 ```bash

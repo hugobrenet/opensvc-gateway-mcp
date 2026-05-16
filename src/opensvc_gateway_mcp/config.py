@@ -27,6 +27,13 @@ class Settings(BaseSettings):
             "OPENSVC_TLS_VERIFY",
         ),
     )
+    collector_ai_config_path: str = Field(
+        default="/ai/llm/config",
+        validation_alias=AliasChoices(
+            "OPENSVC_COLLECTOR_AI_CONFIG_PATH",
+            "COLLECTOR_AI_CONFIG_PATH",
+        ),
+    )
 
     gateway_internal_token: str | None = Field(
         default=None,
@@ -55,6 +62,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices(
             "OPENSVC_MCP_REQUEST_TIMEOUT_SECONDS",
             "MCP_REQUEST_TIMEOUT_SECONDS",
+        ),
+    )
+    llm_request_timeout_seconds: float = Field(
+        default=60.0,
+        validation_alias=AliasChoices(
+            "OPENSVC_LLM_REQUEST_TIMEOUT_SECONDS",
+            "LLM_REQUEST_TIMEOUT_SECONDS",
         ),
     )
 
