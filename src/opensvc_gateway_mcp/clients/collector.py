@@ -45,9 +45,14 @@ class CollectorClient:
         self,
         credentials: HTTPBasicCredentials,
     ) -> LlmProfile:
+        headers = {}
+        if self.settings.gateway_internal_token:
+            headers["X-OpenSVC-Gateway-Token"] = self.settings.gateway_internal_token
         response = await self._get(
             self.settings.collector_ai_config_path,
             credentials=credentials,
+            headers=headers,
+            auth_error_statuses={401},
         )
         return LlmProfile.model_validate(_unwrap_config_payload(response.json()))
 
@@ -55,11 +60,16 @@ class CollectorClient:
         self,
         path: str,
         credentials: HTTPBasicCredentials,
+        headers: dict[str, str] | None = None,
+        auth_error_statuses: set[int] | None = None,
     ) -> httpx.Response:
         url = (
             f"{self.settings.collector_api_base_url.rstrip('/')}/"
             f"{path.lstrip('/')}"
         )
+        request_headers = {"Accept": "application/json"}
+        if headers:
+            request_headers.update(headers)
         async with httpx.AsyncClient(
             timeout=self.settings.collector_request_timeout_seconds,
             verify=self.settings.collector_tls_verify,
@@ -68,10 +78,12 @@ class CollectorClient:
             response = await client.get(
                 url,
                 auth=(credentials.username, credentials.password),
-                headers={"Accept": "application/json"},
+                headers=request_headers,
             )
 
-        if response.status_code in {401, 403}:
+        if auth_error_statuses is None:
+            auth_error_statuses = {401, 403}
+        if response.status_code in auth_error_statuses:
             raise InvalidCollectorCredentials
 
         response.raise_for_status()
