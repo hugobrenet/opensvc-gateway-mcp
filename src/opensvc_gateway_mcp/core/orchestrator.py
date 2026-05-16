@@ -182,7 +182,11 @@ def _llm_proxy_tool_description(name: str) -> str:
     if name == "call_tool":
         return (
             "Call one OpenSVC Collector MCP tool selected from search_tools "
-            "results, with arguments matching that tool schema."
+            "results. Always put the selected target tool input inside this "
+            "proxy tool's arguments object. Correct call_tool payload: "
+            '{"name":"get_node","arguments":{"request":{"nodename":"node1"}}}. '
+            "Incorrect: "
+            '{"name":"get_node","request":{"nodename":"node1"}}.'
         )
     return ""
 
@@ -213,7 +217,13 @@ def _llm_proxy_tool_schema(name: str) -> dict[str, Any]:
                 },
                 "arguments": {
                     "type": "object",
-                    "description": "Arguments matching the selected tool input schema.",
+                    "description": (
+                        "Required target tool input object. Put the full input "
+                        "schema required by the selected tool here. Do not put "
+                        "target tool fields at the top level of call_tool. "
+                        "For a target schema requiring request.nodename, use "
+                        '{"request":{"nodename":"node1"}} as arguments.'
+                    ),
                 },
             },
             "required": ["name", "arguments"],

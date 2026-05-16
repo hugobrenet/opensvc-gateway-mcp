@@ -235,6 +235,12 @@ def test_ai_chat_orchestrates_llm_search_and_call_tool():
         "search_tools",
         "call_tool",
     ]
+    call_tool = first_llm_tools[1]["function"]
+    assert '"arguments":{"request":{"nodename":"node1"}}' in call_tool["description"]
+    assert '"request":{"nodename":"node1"}' in call_tool["description"]
+    assert "Do not put target tool fields at the top level" in (
+        call_tool["parameters"]["properties"]["arguments"]["description"]
+    )
     assert "count_nodes" not in str(first_llm_tools)
     assert "provider-secret" not in response.text
     assert "secret" not in response.text
