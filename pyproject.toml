@@ -11,6 +11,7 @@ requires-python = ">=3.13"
 license = { text = "MIT" }
 dependencies = [
   "fastapi",
+  "fastmcp-slim[client]==3.3.1",
   "httpx",
   "pydantic-settings",
   "uvicorn",
