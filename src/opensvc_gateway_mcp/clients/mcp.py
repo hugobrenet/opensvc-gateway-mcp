@@ -1,15 +1,14 @@
-import json
-from dataclasses import dataclass
-from itertools import count
-from typing import Any
+from collections.abc import Callable
+from typing import Any, Protocol
 
 import httpx
+from fastmcp import Client as FastMcpClient
+from fastmcp.client.transports import StreamableHttpTransport
 from fastapi.security import HTTPBasicCredentials
+from mcp.shared.exceptions import McpError
+from mcp.types import CallToolResult, ListToolsResult
 
 from opensvc_gateway_mcp.config import Settings
-
-
-MCP_PROTOCOL_VERSION = "2025-06-18"
 
 
 class McpClientError(Exception):
@@ -47,60 +46,51 @@ class McpProtocolError(McpClientError):
     """The MCP endpoint returned an invalid or unexpected response."""
 
 
-@dataclass(frozen=True)
-class McpSession:
-    session_id: str | None
-    protocol_version: str
-    initialize_result: dict[str, Any]
+class FastMcpClientProtocol(Protocol):
+    async def __aenter__(self) -> "FastMcpClientProtocol": ...
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...
+
+    async def list_tools_mcp(self, *, cursor: str | None = None) -> ListToolsResult: ...
+
+    async def call_tool_mcp(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        **kwargs: Any,
+    ) -> CallToolResult: ...
+
+
+FastMcpClientFactory = Callable[[HTTPBasicCredentials], FastMcpClientProtocol]
 
 
 class McpClient:
     def __init__(
         self,
         settings: Settings,
-        transport: httpx.AsyncBaseTransport | None = None,
+        client_factory: FastMcpClientFactory | None = None,
     ) -> None:
         self.settings = settings
-        self.transport = transport
-        self._request_ids = count(1)
-
-    async def initialize(
-        self,
-        credentials: HTTPBasicCredentials,
-    ) -> McpSession:
-        response = await self._request(
-            credentials=credentials,
-            method="initialize",
-            params={
-                "protocolVersion": MCP_PROTOCOL_VERSION,
-                "capabilities": {},
-                "clientInfo": {
-                    "name": "opensvc-gateway-mcp",
-                    "version": "0.1.0",
-                },
-            },
-        )
-        result = _extract_result(response)
-        protocol_version = str(result.get("protocolVersion") or MCP_PROTOCOL_VERSION)
-        return McpSession(
-            session_id=response.headers.get("mcp-session-id"),
-            protocol_version=protocol_version,
-            initialize_result=result,
-        )
+        self._client_factory = client_factory or self._build_fastmcp_client
 
     async def list_tools(
         self,
         credentials: HTTPBasicCredentials,
     ) -> dict[str, Any]:
-        session = await self.initialize(credentials)
-        await self.send_initialized(credentials, session)
-        response = await self._request(
-            credentials=credentials,
-            method="tools/list",
-            params={},
-            session=session,
-        )
-        return _extract_result(response)
+        try:
+            async with self._client_factory(credentials) as client:
+                result = await client.list_tools_mcp()
+        except McpError as exc:
+            raise _json_rpc_error_from_mcp_error(exc) from exc
+        except httpx.HTTPStatusError as exc:
+            raise McpHttpError(exc.response.status_code) from exc
+        except httpx.HTTPError as exc:
+            raise McpTransportError(
+                f"MCP HTTP request failed: {type(exc).__name__}"
+            ) from exc
+        except RuntimeError as exc:
+            raise McpProtocolError(str(exc)) from exc
+        return _model_dump(result)
 
     async def call_tool(
         self,
@@ -109,171 +99,48 @@ class McpClient:
         name: str,
         arguments: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        session = await self.initialize(credentials)
-        await self.send_initialized(credentials, session)
-        response = await self._request(
-            credentials=credentials,
-            method="tools/call",
-            params={
-                "name": name,
-                "arguments": arguments or {},
-            },
-            session=session,
-        )
-        return _extract_result(response)
+        try:
+            async with self._client_factory(credentials) as client:
+                result = await client.call_tool_mcp(name, arguments or {})
+        except McpError as exc:
+            raise _json_rpc_error_from_mcp_error(exc) from exc
+        except httpx.HTTPStatusError as exc:
+            raise McpHttpError(exc.response.status_code) from exc
+        except httpx.HTTPError as exc:
+            raise McpTransportError(
+                f"MCP HTTP request failed: {type(exc).__name__}"
+            ) from exc
+        except RuntimeError as exc:
+            raise McpProtocolError(str(exc)) from exc
+        return _model_dump(result)
 
-    async def send_initialized(
+    def _build_fastmcp_client(
         self,
         credentials: HTTPBasicCredentials,
-        session: McpSession,
-    ) -> None:
-        await self._notification(
-            credentials=credentials,
-            method="notifications/initialized",
-            params={},
-            session=session,
+    ) -> FastMcpClientProtocol:
+        transport = StreamableHttpTransport(
+            url=self.settings.mcp_url,
+            auth=httpx.BasicAuth(credentials.username, credentials.password),
         )
-
-    async def _request(
-        self,
-        *,
-        credentials: HTTPBasicCredentials,
-        method: str,
-        params: dict[str, Any],
-        session: McpSession | None = None,
-    ) -> httpx.Response:
-        payload = {
-            "jsonrpc": "2.0",
-            "id": next(self._request_ids),
-            "method": method,
-            "params": params,
-        }
-        response = await self._post(
-            credentials=credentials,
-            payload=payload,
-            session=session,
-        )
-        if response.status_code == 202:
-            raise McpProtocolError(f"MCP request {method!r} returned no response")
-        _extract_message(response)
-        return response
-
-    async def _notification(
-        self,
-        *,
-        credentials: HTTPBasicCredentials,
-        method: str,
-        params: dict[str, Any],
-        session: McpSession,
-    ) -> None:
-        payload = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params,
-        }
-        response = await self._post(
-            credentials=credentials,
-            payload=payload,
-            session=session,
-        )
-        if response.status_code != 202:
-            _extract_message(response)
-
-    async def _post(
-        self,
-        *,
-        credentials: HTTPBasicCredentials,
-        payload: dict[str, Any],
-        session: McpSession | None,
-    ) -> httpx.Response:
-        headers = {
-            "Accept": "application/json, text/event-stream",
-            "Content-Type": "application/json",
-        }
-        if session is not None:
-            if session.session_id:
-                headers["mcp-session-id"] = session.session_id
-            headers["mcp-protocol-version"] = session.protocol_version
-
-        async with httpx.AsyncClient(
+        return FastMcpClient(
+            transport,
+            name="opensvc-gateway-mcp",
             timeout=self.settings.mcp_request_timeout_seconds,
-            transport=self.transport,
-        ) as client:
-            try:
-                response = await client.post(
-                    self.settings.mcp_url,
-                    json=payload,
-                    headers=headers,
-                    auth=(credentials.username, credentials.password),
-                )
-            except httpx.HTTPError as exc:
-                raise McpTransportError(
-                    f"MCP HTTP request failed: {type(exc).__name__}"
-                ) from exc
-
-        if response.status_code >= 400:
-            try:
-                _extract_message(response)
-            except McpJsonRpcError:
-                raise
-            except McpProtocolError:
-                pass
-            raise McpHttpError(response.status_code)
-        return response
+        )
 
 
-def _extract_result(response: httpx.Response) -> dict[str, Any]:
-    message = _extract_message(response)
-    result = message.get("result")
-    if not isinstance(result, dict):
+def _json_rpc_error_from_mcp_error(exc: McpError) -> McpJsonRpcError:
+    return McpJsonRpcError(
+        code=exc.error.code,
+        message=exc.error.message,
+        data=exc.error.data,
+    )
+
+
+def _model_dump(result: Any) -> dict[str, Any]:
+    if not hasattr(result, "model_dump"):
+        raise McpProtocolError("MCP response did not contain a Pydantic result")
+    payload = result.model_dump(by_alias=True, exclude_none=True)
+    if not isinstance(payload, dict):
         raise McpProtocolError("MCP response did not contain an object result")
-    return result
-
-
-def _extract_message(response: httpx.Response) -> dict[str, Any]:
-    content_type = response.headers.get("content-type", "").lower()
-    if content_type.startswith("application/json"):
-        message = response.json()
-    elif content_type.startswith("text/event-stream"):
-        message = _extract_sse_message(response.text)
-    else:
-        raise McpProtocolError(
-            f"MCP response used unsupported content type {content_type!r}"
-        )
-
-    if not isinstance(message, dict):
-        raise McpProtocolError("MCP response was not a JSON object")
-
-    error = message.get("error")
-    if isinstance(error, dict):
-        raise McpJsonRpcError(
-            code=error.get("code") if isinstance(error.get("code"), int) else None,
-            message=str(error.get("message") or "MCP JSON-RPC error"),
-            data=error.get("data"),
-        )
-
-    if message.get("jsonrpc") != "2.0":
-        raise McpProtocolError("MCP response was not a JSON-RPC 2.0 message")
-
-    return message
-
-
-def _extract_sse_message(body: str) -> dict[str, Any]:
-    for event in body.split("\n\n"):
-        data_lines = [
-            line.removeprefix("data:").lstrip()
-            for line in event.splitlines()
-            if line.startswith("data:")
-        ]
-        if not data_lines:
-            continue
-
-        data = "\n".join(data_lines).strip()
-        if not data:
-            continue
-
-        message = json.loads(data)
-        if isinstance(message, dict):
-            return message
-
-    raise McpProtocolError("MCP SSE response did not contain a JSON-RPC message")
+    return payload

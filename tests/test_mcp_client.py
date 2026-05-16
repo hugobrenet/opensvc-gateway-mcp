@@ -1,10 +1,10 @@
 import asyncio
-import base64
-import json
 
 import httpx
 import pytest
 from fastapi.security import HTTPBasicCredentials
+from mcp.shared.exceptions import McpError
+from mcp.types import CallToolResult, ErrorData, ListToolsResult, Tool
 
 from opensvc_gateway_mcp.clients.mcp import (
     McpClient,
@@ -25,97 +25,60 @@ def _credentials() -> HTTPBasicCredentials:
     return HTTPBasicCredentials(username="user-a", password="secret")
 
 
-def _basic_auth_value(username: str, password: str) -> str:
-    token = base64.b64encode(f"{username}:{password}".encode()).decode()
-    return f"Basic {token}"
+class FakeFastMcpClient:
+    def __init__(
+        self,
+        *,
+        list_tools_result: ListToolsResult | None = None,
+        call_tool_result: CallToolResult | None = None,
+        exc: Exception | None = None,
+    ) -> None:
+        self.list_tools_result = list_tools_result
+        self.call_tool_result = call_tool_result
+        self.exc = exc
+        self.tool_calls = []
+        self.entered = False
+        self.exited = False
 
+    async def __aenter__(self):
+        self.entered = True
+        if self.exc is not None:
+            raise self.exc
+        return self
 
-def _json_response(payload: dict, *, headers: dict[str, str] | None = None):
-    return httpx.Response(
-        200,
-        json=payload,
-        headers={"Content-Type": "application/json", **(headers or {})},
-    )
+    async def __aexit__(self, exc_type, exc, tb):
+        self.exited = True
 
-
-def _sse_response(payload: dict):
-    return httpx.Response(
-        200,
-        text=f"event: message\ndata: {json.dumps(payload)}\n\n",
-        headers={"Content-Type": "text/event-stream"},
-    )
-
-
-def test_mcp_client_initialize_posts_basic_auth_and_returns_session():
-    requests = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return _json_response(
-            {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "result": {
-                    "protocolVersion": "2025-06-18",
-                    "capabilities": {},
-                    "serverInfo": {"name": "collector-mcp"},
-                },
-            },
-            headers={"mcp-session-id": "MCP-SESSION"},
+    async def list_tools_mcp(self, *, cursor=None):
+        if self.exc is not None:
+            raise self.exc
+        return self.list_tools_result or ListToolsResult(
+            tools=[
+                Tool(name="search_tools", inputSchema={"type": "object"}),
+                Tool(name="call_tool", inputSchema={"type": "object"}),
+            ]
         )
 
-    client = McpClient(_settings(), transport=httpx.MockTransport(handler))
-
-    session = asyncio.run(client.initialize(_credentials()))
-
-    assert session.session_id == "MCP-SESSION"
-    assert session.protocol_version == "2025-06-18"
-    assert session.initialize_result["serverInfo"]["name"] == "collector-mcp"
-    assert len(requests) == 1
-    request = requests[0]
-    assert request.url == "https://mcp.invalid/mcp"
-    assert request.headers["authorization"] == _basic_auth_value("user-a", "secret")
-    assert request.headers["accept"] == "application/json, text/event-stream"
-    assert request.headers["content-type"] == "application/json"
-    assert json.loads(request.content)["method"] == "initialize"
+    async def call_tool_mcp(self, name, arguments, **kwargs):
+        self.tool_calls.append({"name": name, "arguments": arguments})
+        if self.exc is not None:
+            raise self.exc
+        return self.call_tool_result or CallToolResult(
+            content=[],
+            structuredContent={"count": 2},
+            isError=False,
+        )
 
 
-def test_mcp_client_list_tools_initializes_then_uses_mcp_session():
-    requests = []
+def test_mcp_client_list_tools_uses_native_client_context():
+    credentials_seen = []
+    native_client = FakeFastMcpClient()
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        payload = json.loads(request.content)
-        method = payload["method"]
-        if method == "initialize":
-            return _json_response(
-                {
-                    "jsonrpc": "2.0",
-                    "id": payload["id"],
-                    "result": {"protocolVersion": "2025-06-18", "capabilities": {}},
-                },
-                headers={"mcp-session-id": "MCP-SESSION"},
-            )
-        if method == "notifications/initialized":
-            return httpx.Response(202, headers={"Content-Type": "application/json"})
-        if method == "tools/list":
-            assert request.headers["mcp-session-id"] == "MCP-SESSION"
-            assert request.headers["mcp-protocol-version"] == "2025-06-18"
-            return _sse_response(
-                {
-                    "jsonrpc": "2.0",
-                    "id": payload["id"],
-                    "result": {
-                        "tools": [
-                            {"name": "search_tools"},
-                            {"name": "call_tool"},
-                        ]
-                    },
-                }
-            )
-        raise AssertionError(f"unexpected MCP method {method}")
+    def factory(credentials):
+        credentials_seen.append(credentials)
+        return native_client
 
-    client = McpClient(_settings(), transport=httpx.MockTransport(handler))
+    client = McpClient(_settings(), client_factory=factory)
 
     result = asyncio.run(client.list_tools(_credentials()))
 
@@ -123,46 +86,15 @@ def test_mcp_client_list_tools_initializes_then_uses_mcp_session():
         "search_tools",
         "call_tool",
     ]
-    assert [json.loads(request.content)["method"] for request in requests] == [
-        "initialize",
-        "notifications/initialized",
-        "tools/list",
-    ]
+    assert credentials_seen[0].username == "user-a"
+    assert credentials_seen[0].password == "secret"
+    assert native_client.entered is True
+    assert native_client.exited is True
 
 
 def test_mcp_client_call_tool_sends_name_and_arguments():
-    calls = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        payload = json.loads(request.content)
-        calls.append(payload)
-        method = payload["method"]
-        if method == "initialize":
-            return _json_response(
-                {
-                    "jsonrpc": "2.0",
-                    "id": payload["id"],
-                    "result": {"protocolVersion": "2025-06-18", "capabilities": {}},
-                },
-                headers={"mcp-session-id": "MCP-SESSION"},
-            )
-        if method == "notifications/initialized":
-            return httpx.Response(202, headers={"Content-Type": "application/json"})
-        if method == "tools/call":
-            assert payload["params"] == {
-                "name": "count_nodes",
-                "arguments": {"request": {"filters": {"asset_env": "lab"}}},
-            }
-            return _json_response(
-                {
-                    "jsonrpc": "2.0",
-                    "id": payload["id"],
-                    "result": {"structuredContent": {"count": 2}},
-                }
-            )
-        raise AssertionError(f"unexpected MCP method {method}")
-
-    client = McpClient(_settings(), transport=httpx.MockTransport(handler))
+    native_client = FakeFastMcpClient()
+    client = McpClient(_settings(), client_factory=lambda credentials: native_client)
 
     result = asyncio.run(
         client.call_tool(
@@ -172,31 +104,32 @@ def test_mcp_client_call_tool_sends_name_and_arguments():
         )
     )
 
-    assert result == {"structuredContent": {"count": 2}}
-    assert [call["method"] for call in calls] == [
-        "initialize",
-        "notifications/initialized",
-        "tools/call",
+    assert result == {
+        "content": [],
+        "structuredContent": {"count": 2},
+        "isError": False,
+    }
+    assert native_client.tool_calls == [
+        {
+            "name": "count_nodes",
+            "arguments": {"request": {"filters": {"asset_env": "lab"}}},
+        }
     ]
 
 
 def test_mcp_client_raises_json_rpc_error_without_exposing_credentials():
-    def handler(request: httpx.Request) -> httpx.Response:
-        return _json_response(
-            {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "error": {
-                    "code": -32001,
-                    "message": "Collector authentication failed",
-                },
-            }
+    native_client = FakeFastMcpClient(
+        exc=McpError(
+            ErrorData(
+                code=-32001,
+                message="Collector authentication failed",
+            )
         )
-
-    client = McpClient(_settings(), transport=httpx.MockTransport(handler))
+    )
+    client = McpClient(_settings(), client_factory=lambda credentials: native_client)
 
     with pytest.raises(McpJsonRpcError) as exc_info:
-        asyncio.run(client.initialize(_credentials()))
+        asyncio.run(client.list_tools(_credentials()))
 
     assert exc_info.value.code == -32001
     assert str(exc_info.value) == "Collector authentication failed"
@@ -204,13 +137,11 @@ def test_mcp_client_raises_json_rpc_error_without_exposing_credentials():
 
 
 def test_mcp_client_wraps_httpx_transport_errors_without_exposing_credentials():
-    def handler(request: httpx.Request) -> httpx.Response:
-        raise httpx.ReadTimeout("timed out", request=request)
-
-    client = McpClient(_settings(), transport=httpx.MockTransport(handler))
+    native_client = FakeFastMcpClient(exc=httpx.ReadTimeout("timed out"))
+    client = McpClient(_settings(), client_factory=lambda credentials: native_client)
 
     with pytest.raises(McpTransportError) as exc_info:
-        asyncio.run(client.initialize(_credentials()))
+        asyncio.run(client.list_tools(_credentials()))
 
     assert "ReadTimeout" in str(exc_info.value)
     assert "secret" not in str(exc_info.value)
