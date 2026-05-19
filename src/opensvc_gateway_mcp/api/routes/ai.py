@@ -20,17 +20,17 @@ from opensvc_gateway_mcp.clients.llm import (
 )
 from opensvc_gateway_mcp.clients.mcp import McpClient, McpClientError
 from opensvc_gateway_mcp.core.orchestrator import AiOrchestrationError, AiOrchestrator
-from opensvc_gateway_mcp.core.sessions import InMemoryGatewaySessionStore
+from opensvc_gateway_mcp.core.sessions import GatewaySessionStore
 from opensvc_gateway_mcp.schemas.ai import AiChatRequest, AiChatResponse
 
 
 router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 
 
-def _credentials_from_gateway_session(
+async def _credentials_from_gateway_session(
     *,
     session_id: str | None,
-    store: InMemoryGatewaySessionStore,
+    store: GatewaySessionStore,
 ) -> HTTPBasicCredentials:
     if not session_id:
         raise HTTPException(
@@ -38,7 +38,7 @@ def _credentials_from_gateway_session(
             detail="Missing OpenSVC AI session",
         )
 
-    session = store.get(session_id)
+    session = await store.get(session_id)
     if session is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -54,7 +54,7 @@ def _credentials_from_gateway_session(
 @router.post("/chat", response_model=AiChatResponse)
 async def chat(
     request: AiChatRequest,
-    store: Annotated[InMemoryGatewaySessionStore, Depends(get_gateway_session_store)],
+    store: Annotated[GatewaySessionStore, Depends(get_gateway_session_store)],
     collector_client_provider: Annotated[
         Callable[[], CollectorClient], Depends(get_collector_client_provider)
     ],
@@ -66,7 +66,7 @@ async def chat(
     ],
     x_opensvc_ai_session: Annotated[str | None, Header()] = None,
 ) -> AiChatResponse:
-    credentials = _credentials_from_gateway_session(
+    credentials = await _credentials_from_gateway_session(
         session_id=x_opensvc_ai_session,
         store=store,
     )

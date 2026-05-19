@@ -10,7 +10,7 @@ from opensvc_gateway_mcp.api.dependencies import (
     get_mcp_client_provider,
 )
 from opensvc_gateway_mcp.clients.mcp import McpClient, McpClientError, McpJsonRpcError
-from opensvc_gateway_mcp.core.sessions import InMemoryGatewaySessionStore
+from opensvc_gateway_mcp.core.sessions import GatewaySessionStore
 from opensvc_gateway_mcp.schemas.mcp import CallMcpToolRequest, SearchMcpToolsRequest
 
 
@@ -53,10 +53,10 @@ def _raise_for_proxied_tool_error(result: dict[str, Any]) -> None:
             )
 
 
-def _credentials_from_gateway_session(
+async def _credentials_from_gateway_session(
     *,
     session_id: str | None,
-    store: InMemoryGatewaySessionStore,
+    store: GatewaySessionStore,
 ) -> HTTPBasicCredentials:
     if not session_id:
         raise HTTPException(
@@ -64,7 +64,7 @@ def _credentials_from_gateway_session(
             detail="Missing OpenSVC AI session",
         )
 
-    session = store.get(session_id)
+    session = await store.get(session_id)
     if session is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -79,13 +79,13 @@ def _credentials_from_gateway_session(
 
 @router.get("/tools")
 async def list_mcp_tools(
-    store: Annotated[InMemoryGatewaySessionStore, Depends(get_gateway_session_store)],
+    store: Annotated[GatewaySessionStore, Depends(get_gateway_session_store)],
     mcp_client_provider: Annotated[
         Callable[[], McpClient], Depends(get_mcp_client_provider)
     ],
     x_opensvc_ai_session: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
-    credentials = _credentials_from_gateway_session(
+    credentials = await _credentials_from_gateway_session(
         session_id=x_opensvc_ai_session,
         store=store,
     )
@@ -107,13 +107,13 @@ async def list_mcp_tools(
 @router.post("/tools/search")
 async def search_mcp_tools(
     request: SearchMcpToolsRequest,
-    store: Annotated[InMemoryGatewaySessionStore, Depends(get_gateway_session_store)],
+    store: Annotated[GatewaySessionStore, Depends(get_gateway_session_store)],
     mcp_client_provider: Annotated[
         Callable[[], McpClient], Depends(get_mcp_client_provider)
     ],
     x_opensvc_ai_session: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
-    credentials = _credentials_from_gateway_session(
+    credentials = await _credentials_from_gateway_session(
         session_id=x_opensvc_ai_session,
         store=store,
     )
@@ -139,13 +139,13 @@ async def search_mcp_tools(
 @router.post("/tools/call")
 async def call_mcp_tool(
     request: CallMcpToolRequest,
-    store: Annotated[InMemoryGatewaySessionStore, Depends(get_gateway_session_store)],
+    store: Annotated[GatewaySessionStore, Depends(get_gateway_session_store)],
     mcp_client_provider: Annotated[
         Callable[[], McpClient], Depends(get_mcp_client_provider)
     ],
     x_opensvc_ai_session: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
-    credentials = _credentials_from_gateway_session(
+    credentials = await _credentials_from_gateway_session(
         session_id=x_opensvc_ai_session,
         store=store,
     )

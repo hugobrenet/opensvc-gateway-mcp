@@ -12,7 +12,7 @@ from opensvc_gateway_mcp.clients.collector import (
     InvalidCollectorCredentials,
 )
 from opensvc_gateway_mcp.config import Settings, get_settings
-from opensvc_gateway_mcp.core.sessions import InMemoryGatewaySessionStore
+from opensvc_gateway_mcp.core.sessions import GatewaySessionStore
 from opensvc_gateway_mcp.schemas.sessions import (
     CreateGatewaySessionRequest,
     DeleteGatewaySessionResponse,
@@ -45,7 +45,7 @@ async def create_gateway_session(
     _: Annotated[None, Depends(require_internal_token)],
     settings: Annotated[Settings, Depends(get_settings)],
     collector: Annotated[CollectorClient, Depends(get_collector_client)],
-    store: Annotated[InMemoryGatewaySessionStore, Depends(get_gateway_session_store)],
+    store: Annotated[GatewaySessionStore, Depends(get_gateway_session_store)],
 ) -> GatewaySessionResponse:
     credentials = HTTPBasicCredentials(
         username=request.username,
@@ -60,7 +60,7 @@ async def create_gateway_session(
         ) from exc
 
     ttl_seconds = request.ttl_seconds or settings.gateway_session_ttl_seconds
-    session = store.create(
+    session = await store.create(
         username=principal.username,
         password=request.password,
         ttl_seconds=ttl_seconds,
@@ -76,6 +76,6 @@ async def create_gateway_session(
 async def delete_gateway_session(
     session_id: str,
     _: Annotated[None, Depends(require_internal_token)],
-    store: Annotated[InMemoryGatewaySessionStore, Depends(get_gateway_session_store)],
+    store: Annotated[GatewaySessionStore, Depends(get_gateway_session_store)],
 ) -> DeleteGatewaySessionResponse:
-    return DeleteGatewaySessionResponse(deleted=store.delete(session_id))
+    return DeleteGatewaySessionResponse(deleted=await store.delete(session_id))

@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from fastapi.testclient import TestClient
@@ -10,6 +11,10 @@ from opensvc_gateway_mcp.api.dependencies import (
 from opensvc_gateway_mcp.clients.mcp import McpClientError, McpJsonRpcError
 from opensvc_gateway_mcp.core.sessions import InMemoryGatewaySessionStore
 from opensvc_gateway_mcp.main import create_app
+
+
+def create_session(store, **kwargs):
+    return asyncio.run(store.create(**kwargs))
 
 
 class FakeMcpClient:
@@ -111,7 +116,11 @@ class FakeMcpClient:
 
 
 def test_mcp_tools_requires_gateway_session_header():
-    client = TestClient(create_app())
+    app = create_app()
+    app.dependency_overrides[get_gateway_session_store] = (
+        lambda: InMemoryGatewaySessionStore()
+    )
+    client = TestClient(app)
 
     response = client.get("/api/v1/mcp/tools")
 
@@ -139,7 +148,8 @@ def test_mcp_tools_uses_gateway_session_credentials():
     app = create_app()
     store = InMemoryGatewaySessionStore()
     mcp = FakeMcpClient()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -168,7 +178,8 @@ def test_mcp_tools_uses_gateway_session_credentials():
 def test_mcp_tools_maps_mcp_client_error():
     app = create_app()
     store = InMemoryGatewaySessionStore()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -193,7 +204,8 @@ def test_mcp_tools_search_calls_search_tools_with_query():
     app = create_app()
     store = InMemoryGatewaySessionStore()
     mcp = FakeMcpClient()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -230,7 +242,8 @@ def test_mcp_tools_search_calls_search_tools_with_query():
 def test_mcp_tools_search_requires_non_empty_query():
     app = create_app()
     store = InMemoryGatewaySessionStore()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -250,7 +263,8 @@ def test_mcp_tools_search_requires_non_empty_query():
 def test_mcp_tools_search_maps_mcp_client_error():
     app = create_app()
     store = InMemoryGatewaySessionStore()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -276,7 +290,8 @@ def test_mcp_tools_call_uses_call_tool_proxy():
     app = create_app()
     store = InMemoryGatewaySessionStore()
     mcp = FakeMcpClient()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -316,7 +331,8 @@ def test_mcp_tools_call_defaults_arguments_to_empty_object():
     app = create_app()
     store = InMemoryGatewaySessionStore()
     mcp = FakeMcpClient()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -341,7 +357,8 @@ def test_mcp_tools_call_defaults_arguments_to_empty_object():
 def test_mcp_tools_call_requires_non_empty_name():
     app = create_app()
     store = InMemoryGatewaySessionStore()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -361,7 +378,8 @@ def test_mcp_tools_call_requires_non_empty_name():
 def test_mcp_tools_call_maps_mcp_client_error():
     app = create_app()
     store = InMemoryGatewaySessionStore()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -386,7 +404,8 @@ def test_mcp_tools_call_maps_mcp_client_error():
 def test_mcp_tools_call_preserves_json_rpc_validation_error():
     app = create_app()
     store = InMemoryGatewaySessionStore()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -416,7 +435,8 @@ def test_mcp_tools_call_preserves_json_rpc_validation_error():
 def test_mcp_tools_call_maps_proxied_tool_validation_result_to_422():
     app = create_app()
     store = InMemoryGatewaySessionStore()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,

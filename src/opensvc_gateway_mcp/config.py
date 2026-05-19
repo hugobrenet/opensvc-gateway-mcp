@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -47,6 +48,27 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices(
             "OPENSVC_GATEWAY_SESSION_TTL_SECONDS",
             "GATEWAY_SESSION_TTL_SECONDS",
+        ),
+    )
+    gateway_session_store: Literal["memory", "redis"] = Field(
+        default="memory",
+        validation_alias=AliasChoices(
+            "OPENSVC_GATEWAY_SESSION_STORE",
+            "GATEWAY_SESSION_STORE",
+        ),
+    )
+    gateway_redis_url: str = Field(
+        default="redis://127.0.0.1:6379/0",
+        validation_alias=AliasChoices(
+            "OPENSVC_GATEWAY_REDIS_URL",
+            "GATEWAY_REDIS_URL",
+        ),
+    )
+    gateway_redis_key_prefix: str = Field(
+        default="ai_gateway:session:",
+        validation_alias=AliasChoices(
+            "OPENSVC_GATEWAY_REDIS_KEY_PREFIX",
+            "GATEWAY_REDIS_KEY_PREFIX",
         ),
     )
 

@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from fastapi.testclient import TestClient
@@ -17,6 +18,10 @@ from opensvc_gateway_mcp.clients.llm import (
 from opensvc_gateway_mcp.core.sessions import InMemoryGatewaySessionStore
 from opensvc_gateway_mcp.main import create_app
 from opensvc_gateway_mcp.schemas.ai import LlmProfile
+
+
+def create_session(store, **kwargs):
+    return asyncio.run(store.create(**kwargs))
 
 
 class FakeCollectorClient:
@@ -186,7 +191,8 @@ def test_ai_chat_orchestrates_llm_search_and_call_tool():
     collector = FakeCollectorClient()
     mcp = FakeMcpClient()
     llm = FakeLlmClient()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -247,7 +253,11 @@ def test_ai_chat_orchestrates_llm_search_and_call_tool():
 
 
 def test_ai_chat_requires_gateway_session_header():
-    client = TestClient(create_app())
+    app = create_app()
+    app.dependency_overrides[get_gateway_session_store] = (
+        lambda: InMemoryGatewaySessionStore()
+    )
+    client = TestClient(app)
 
     response = client.post("/api/v1/ai/chat", json={"message": "hello"})
 

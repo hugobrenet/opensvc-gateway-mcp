@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
@@ -12,8 +13,19 @@ from opensvc_gateway_mcp.clients.collector import (
     InvalidCollectorCredentials,
 )
 from opensvc_gateway_mcp.config import Settings, get_settings
-from opensvc_gateway_mcp.core.sessions import InMemoryGatewaySessionStore
+from opensvc_gateway_mcp.core.sessions import (
+    InMemoryGatewaySessionStore,
+    RedisGatewaySessionStore,
+)
 from opensvc_gateway_mcp.main import create_app
+
+
+def create_session(store, **kwargs):
+    return asyncio.run(store.create(**kwargs))
+
+
+def get_session(store,  session_id):
+    return asyncio.run(store.get(session_id))
 
 
 class FakeCollectorClient:
@@ -29,6 +41,22 @@ class FakeCollectorClient:
             username=credentials.username,
             raw={"username": credentials.username},
         )
+
+
+class FakeRedis:
+    def __init__(self) -> None:
+        self.values = {}
+        self.ttls = {}
+
+    async def setex(self, key, ttl, value):
+        self.values[key] = value
+        self.ttls[key] = ttl
+
+    async def get(self, key):
+        return self.values.get(key)
+
+    async def delete(self, key):
+        return int(self.values.pop(key, None) is not None)
 
 
 def test_internal_session_requires_gateway_token():
@@ -75,7 +103,7 @@ def test_internal_session_validates_collector_credentials_and_stores_session():
     assert len(collector.calls) == 1
     assert collector.calls[0].username == "user-a"
     assert collector.calls[0].password == "secret"
-    stored = store.get(payload["session_id"])
+    stored = get_session(store, payload["session_id"])
     assert stored is not None
     assert stored.username == "user-a"
     assert stored.password.get_secret_value() == "secret"
@@ -127,7 +155,7 @@ def test_internal_session_accepts_requested_ttl():
 
     assert response.status_code == 200
     payload = response.json()
-    stored = store.get(payload["session_id"])
+    stored = get_session(store, payload["session_id"])
     assert stored is not None
     remaining = (stored.expires_at - datetime.now(UTC)).total_seconds()
     assert remaining > 3500
@@ -136,7 +164,8 @@ def test_internal_session_accepts_requested_ttl():
 def test_internal_session_delete_removes_session():
     app = create_app()
     store = InMemoryGatewaySessionStore()
-    session = store.create(
+    session = create_session(
+        store,
         username="user-a",
         password=SecretStr("secret"),
         ttl_seconds=60,
@@ -155,4 +184,40 @@ def test_internal_session_delete_removes_session():
 
     assert response.status_code == 200
     assert response.json() == {"deleted": True}
-    assert store.get(session.session_id) is None
+    assert get_session(store, session.session_id) is None
+
+
+def test_redis_gateway_session_store_round_trips_session_with_ttl():
+    redis = FakeRedis()
+    store = RedisGatewaySessionStore(
+        redis_url="redis://redis.invalid/0",
+        key_prefix="test:session:",
+        redis_client=redis,
+    )
+
+    session = create_session(
+        store,
+        username="user-a",
+        password=SecretStr("secret"),
+        ttl_seconds=60,
+    )
+
+    assert redis.ttls[f"test:session:{session.session_id}"] == 60
+    stored = get_session(store, session.session_id)
+    assert stored is not None
+    assert stored.username == "user-a"
+    assert stored.password.get_secret_value() == "secret"
+    assert "secret" not in repr(stored)
+
+
+def test_redis_gateway_session_store_deletes_corrupt_payload():
+    redis = FakeRedis()
+    store = RedisGatewaySessionStore(
+        redis_url="redis://redis.invalid/0",
+        key_prefix="test:session:",
+        redis_client=redis,
+    )
+    redis.values["test:session:bad"] = "{bad json"
+
+    assert get_session(store, "bad") is None
+    assert "test:session:bad" not in redis.values
