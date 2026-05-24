@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     )
 
     mcp_url: str = Field(
-        default="http://127.0.0.1:8001/mcp",
+        default="http://127.0.0.1:8011/mcp",
         validation_alias=AliasChoices(
             "OPENSVC_MCP_URL",
             "MCP_URL",
