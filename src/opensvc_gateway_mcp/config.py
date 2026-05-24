@@ -8,6 +8,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore")
 
+    gateway_host: str = Field(
+        default="127.0.0.1",
+        validation_alias=AliasChoices(
+            "OPENSVC_GATEWAY_HOST",
+            "GATEWAY_HOST",
+        ),
+    )
+    gateway_port: int = Field(
+        default=8010,
+        validation_alias=AliasChoices(
+            "OPENSVC_GATEWAY_PORT",
+            "GATEWAY_PORT",
+        ),
+    )
+
     collector_api_base_url: str = Field(
         validation_alias=AliasChoices(
             "OPENSVC_COLLECTOR_API_BASE_URL",

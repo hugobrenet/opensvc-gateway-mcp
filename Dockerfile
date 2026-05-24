@@ -20,4 +20,4 @@ USER opensvc
 
 EXPOSE 8010
 
-CMD ["sh", "-c", "exec python -m uvicorn opensvc_gateway_mcp.main:app --host ${OPENSVC_GATEWAY_HOST} --port ${OPENSVC_GATEWAY_PORT}"]
+CMD ["opensvc-gateway-mcp"]

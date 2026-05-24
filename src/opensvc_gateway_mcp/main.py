@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from opensvc_gateway_mcp.api.router import api_router
+from opensvc_gateway_mcp.config import get_settings
 
 
 def create_app() -> FastAPI:
@@ -20,9 +21,10 @@ app = create_app()
 
 
 def run() -> None:
+    settings = get_settings()
     uvicorn.run(
         "opensvc_gateway_mcp.main:app",
-        host="127.0.0.1",
-        port=8010,
+        host=settings.gateway_host,
+        port=settings.gateway_port,
         reload=False,
     )
