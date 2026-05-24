@@ -23,12 +23,12 @@ Current scope:
 - Basic Auth validation endpoint against the OpenSVC Collector
 - internal gateway session endpoints for Collector backend integration
 - test coverage for the health, auth, and internal session endpoints
+- Redis-backed gateway sessions for production-style deployments
 
 Planned scope:
 
 - connect to the OpenSVC Collector MCP server with the same user credentials
 - expose controlled backend endpoints for MCP access
-- move from in-memory sessions to Redis or another shared store for production
 
 ## Run
 
@@ -44,6 +44,14 @@ Start the API:
 PYTHONPATH=src uvicorn opensvc_gateway_mcp.main:app --host 127.0.0.1 --port 8010
 ```
 
+When using the package entrypoint, bind host and port come from the runtime
+configuration:
+
+```bash
+OPENSVC_COLLECTOR_API_BASE_URL=http://127.0.0.1:8001/init/rest/api \
+opensvc-gateway-mcp
+```
+
 ## Health
 
 ```bash
@@ -55,6 +63,47 @@ Expected response:
 ```json
 {"status":"ok"}
 ```
+
+## Runtime Configuration
+
+The gateway is designed to run inside the Collector network namespace. In that
+deployment mode, keep it bound to loopback and let the Collector frontend remain
+the only public HTTPS entrypoint.
+
+Recommended namespace values:
+
+```bash
+export OPENSVC_GATEWAY_HOST=127.0.0.1
+export OPENSVC_GATEWAY_PORT=8010
+export OPENSVC_COLLECTOR_API_BASE_URL=http://127.0.0.1:8001/init/rest/api
+export OPENSVC_COLLECTOR_TLS_VERIFY=false
+export OPENSVC_GATEWAY_SESSION_STORE=redis
+export OPENSVC_GATEWAY_REDIS_URL=redis://127.0.0.1:6379/0
+export OPENSVC_MCP_URL=http://127.0.0.1:8011/mcp
+export OPENSVC_GATEWAY_INTERNAL_TOKEN=<shared-secret>
+```
+
+Variables:
+
+| Variable | Required | Default | Purpose |
+|---|---:|---|---|
+| `OPENSVC_GATEWAY_HOST` | no | `127.0.0.1` | Uvicorn bind host. Keep loopback in the shared Collector namespace. |
+| `OPENSVC_GATEWAY_PORT` | no | `8010` | Uvicorn bind port. |
+| `OPENSVC_COLLECTOR_API_BASE_URL` | yes | none | Collector REST API base URL used by the gateway. |
+| `OPENSVC_COLLECTOR_REQUEST_TIMEOUT_SECONDS` | no | `10.0` | Timeout for Collector REST calls. |
+| `OPENSVC_COLLECTOR_TLS_VERIFY` | no | `true` | TLS verification for Collector REST calls. Use `false` only for internal HTTP or lab self-signed TLS. |
+| `OPENSVC_COLLECTOR_AI_CONFIG_PATH` | no | `/ai/llm/config` | Collector REST path used to fetch the user's LLM profile. |
+| `OPENSVC_GATEWAY_INTERNAL_TOKEN` | required for Collector integration | none | Shared backend secret used by Collector to create/delete gateway sessions and by gateway to fetch LLM config. |
+| `OPENSVC_GATEWAY_SESSION_TTL_SECONDS` | no | `1800` | Default gateway session TTL when Collector does not send one. |
+| `OPENSVC_GATEWAY_SESSION_STORE` | no | `memory` | Session backend: `memory` for dev, `redis` for production-style runtime. |
+| `OPENSVC_GATEWAY_REDIS_URL` | no | `redis://127.0.0.1:6379/0` | Redis URL for gateway session storage. |
+| `OPENSVC_GATEWAY_REDIS_KEY_PREFIX` | no | `ai_gateway:session:` | Redis key prefix for gateway sessions. |
+| `OPENSVC_MCP_URL` | no | `http://127.0.0.1:8011/mcp` | Collector MCP HTTP endpoint. |
+| `OPENSVC_MCP_REQUEST_TIMEOUT_SECONDS` | no | `10.0` | Timeout for MCP calls. |
+| `OPENSVC_LLM_REQUEST_TIMEOUT_SECONDS` | no | `60.0` | Timeout for LLM provider calls. |
+
+Legacy aliases without the `OPENSVC_` prefix exist for some variables, but
+new deployments should use the names above.
 
 
 ## Auth Check
@@ -132,7 +181,7 @@ gateway session. The MCP server still validates Basic Auth itself.
 Optional environment:
 
 ```bash
-export OPENSVC_MCP_URL=http://127.0.0.1:8001/mcp
+export OPENSVC_MCP_URL=http://127.0.0.1:8011/mcp
 export OPENSVC_MCP_REQUEST_TIMEOUT_SECONDS=10
 ```
 
