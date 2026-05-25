@@ -48,7 +48,8 @@ When using the package entrypoint, bind host and port come from the runtime
 configuration:
 
 ```bash
-OPENSVC_COLLECTOR_API_BASE_URL=http://127.0.0.1:8001/init/rest/api \
+OPENSVC_COLLECTOR_API_BASE_URL=https://127.0.0.1/init/rest/api \
+OPENSVC_COLLECTOR_TLS_VERIFY=false \
 opensvc-gateway-mcp
 ```
 
@@ -75,7 +76,7 @@ Recommended namespace values:
 ```bash
 export OPENSVC_GATEWAY_HOST=127.0.0.1
 export OPENSVC_GATEWAY_PORT=8010
-export OPENSVC_COLLECTOR_API_BASE_URL=http://127.0.0.1:8001/init/rest/api
+export OPENSVC_COLLECTOR_API_BASE_URL=https://127.0.0.1/init/rest/api
 export OPENSVC_COLLECTOR_TLS_VERIFY=false
 export OPENSVC_GATEWAY_SESSION_STORE=redis
 export OPENSVC_GATEWAY_REDIS_URL=redis://127.0.0.1:6379/0
@@ -104,6 +105,11 @@ Variables:
 
 Legacy aliases without the `OPENSVC_` prefix exist for some variables, but
 new deployments should use the names above.
+
+In the Collector shared network namespace, do not point this variable to
+`127.0.0.1:8001`: that port is the uWSGI socket behind nginx, not an HTTP REST
+endpoint. Use nginx over HTTPS on `https://127.0.0.1/init/rest/api` and disable
+TLS verification only when the Collector certificate is self-signed.
 
 
 ## Auth Check
