@@ -2,7 +2,7 @@ from collections.abc import Callable
 from functools import lru_cache
 
 from opensvc_gateway_mcp.clients.collector import CollectorClient
-from opensvc_gateway_mcp.clients.llm import OpenAICompatibleLlmClient
+from opensvc_gateway_mcp.clients.llm import LlmProviderClient, create_llm_client
 from opensvc_gateway_mcp.clients.mcp import McpClient
 from opensvc_gateway_mcp.config import get_settings
 from opensvc_gateway_mcp.core.sessions import (
@@ -28,11 +28,11 @@ def get_mcp_client_provider() -> Callable[[], McpClient]:
     return get_mcp_client
 
 
-def get_llm_client() -> OpenAICompatibleLlmClient:
-    return OpenAICompatibleLlmClient(get_settings())
+def get_llm_client() -> LlmProviderClient:
+    return create_llm_client(get_settings())
 
 
-def get_llm_client_provider() -> Callable[[], OpenAICompatibleLlmClient]:
+def get_llm_client_provider() -> Callable[[], LlmProviderClient]:
     return get_llm_client
 
 

@@ -16,7 +16,7 @@ from opensvc_gateway_mcp.clients.collector import CollectorClient
 from opensvc_gateway_mcp.clients.llm import (
     LlmClientError,
     LlmHttpError,
-    OpenAICompatibleLlmClient,
+    LlmProviderClient,
 )
 from opensvc_gateway_mcp.clients.mcp import McpClient, McpClientError
 from opensvc_gateway_mcp.core.orchestrator import AiOrchestrationError, AiOrchestrator
@@ -62,7 +62,7 @@ async def chat(
         Callable[[], McpClient], Depends(get_mcp_client_provider)
     ],
     llm_client_provider: Annotated[
-        Callable[[], OpenAICompatibleLlmClient], Depends(get_llm_client_provider)
+        Callable[[], LlmProviderClient], Depends(get_llm_client_provider)
     ],
     x_opensvc_ai_session: Annotated[str | None, Header()] = None,
 ) -> AiChatResponse:

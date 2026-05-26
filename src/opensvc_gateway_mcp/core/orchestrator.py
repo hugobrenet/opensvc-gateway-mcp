@@ -5,7 +5,7 @@ from typing import Any
 from fastapi.security import HTTPBasicCredentials
 
 from opensvc_gateway_mcp.clients.collector import CollectorClient
-from opensvc_gateway_mcp.clients.llm import OpenAICompatibleLlmClient
+from opensvc_gateway_mcp.clients.llm import LlmProviderClient
 from opensvc_gateway_mcp.clients.mcp import McpClient
 from opensvc_gateway_mcp.schemas.ai import (
     AiChatRequest,
@@ -28,7 +28,7 @@ class AiOrchestrator:
         *,
         collector: CollectorClient,
         mcp_client_provider: Callable[[], McpClient],
-        llm: OpenAICompatibleLlmClient,
+        llm: LlmProviderClient,
     ) -> None:
         self.collector = collector
         self.mcp_client_provider = mcp_client_provider

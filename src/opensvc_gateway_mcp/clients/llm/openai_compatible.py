@@ -1,49 +1,18 @@
 import json
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
+from opensvc_gateway_mcp.clients.llm.base import (
+    LlmAssistantMessage,
+    LlmChatCompletion,
+    LlmHttpError,
+    LlmProtocolError,
+    LlmToolCall,
+    LlmTransportError,
+)
 from opensvc_gateway_mcp.config import Settings
 from opensvc_gateway_mcp.schemas.ai import LlmProfile
-
-
-class LlmClientError(Exception):
-    """Base exception for upstream LLM provider errors."""
-
-
-class LlmHttpError(LlmClientError):
-    def __init__(self, status_code: int, detail: dict[str, Any] | None = None) -> None:
-        self.status_code = status_code
-        self.detail = detail
-        super().__init__(f"LLM HTTP request failed with status {status_code}")
-
-
-class LlmTransportError(LlmClientError):
-    """The LLM provider could not be reached or timed out."""
-
-
-class LlmProtocolError(LlmClientError):
-    """The LLM provider returned an invalid or unsupported response."""
-
-
-@dataclass(frozen=True)
-class LlmToolCall:
-    id: str
-    name: str
-    arguments: dict[str, Any]
-
-
-@dataclass(frozen=True)
-class LlmAssistantMessage:
-    content: str
-    tool_calls: list[LlmToolCall]
-    raw_tool_calls: list[dict[str, Any]]
-
-
-@dataclass(frozen=True)
-class LlmChatCompletion:
-    message: LlmAssistantMessage
 
 
 class OpenAICompatibleLlmClient:
