@@ -23,6 +23,13 @@ class LlmProtocolError(LlmClientError):
     """The LLM provider returned an invalid or unsupported response."""
 
 
+class UnsupportedLlmProvider(LlmClientError):
+    def __init__(self, provider: str, supported_providers: list[str]) -> None:
+        self.provider = provider
+        self.supported_providers = supported_providers
+        super().__init__(f"Unsupported LLM provider: {provider}")
+
+
 @dataclass(frozen=True)
 class LlmToolCall:
     id: str

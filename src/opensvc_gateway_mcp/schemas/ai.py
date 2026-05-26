@@ -14,10 +14,18 @@ class AiChatRequest(BaseModel):
     max_tool_iterations: int | None = Field(default=None, ge=0, le=20)
 
 
+LlmProvider = Literal[
+    "openai_compatible",
+    "anthropic",
+    "gemini",
+    "azure_openai",
+]
+
+
 class LlmProfile(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    provider: Literal["openai_compatible"] = "openai_compatible"
+    provider: LlmProvider = "openai_compatible"
     base_url: str = Field(min_length=1)
     model: str = Field(min_length=1)
     api_key: SecretStr | None = None

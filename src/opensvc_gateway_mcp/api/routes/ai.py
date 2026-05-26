@@ -17,6 +17,7 @@ from opensvc_gateway_mcp.clients.llm import (
     LlmClientError,
     LlmHttpError,
     LlmProviderClient,
+    UnsupportedLlmProvider,
 )
 from opensvc_gateway_mcp.clients.mcp import McpClient, McpClientError
 from opensvc_gateway_mcp.core.orchestrator import AiOrchestrationError, AiOrchestrator
@@ -104,6 +105,15 @@ async def chat(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=detail,
+        ) from exc
+    except UnsupportedLlmProvider as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={
+                "message": "LLM provider is not supported by this gateway",
+                "provider": exc.provider,
+                "supported_providers": exc.supported_providers,
+            },
         ) from exc
     except LlmClientError as exc:
         raise HTTPException(

@@ -14,7 +14,9 @@ from opensvc_gateway_mcp.clients.llm import (
     LlmAssistantMessage,
     LlmChatCompletion,
     LlmToolCall,
+    create_llm_client,
 )
+from opensvc_gateway_mcp.config import Settings
 from opensvc_gateway_mcp.core.sessions import InMemoryGatewaySessionStore
 from opensvc_gateway_mcp.main import create_app
 from opensvc_gateway_mcp.schemas.ai import LlmProfile
@@ -25,13 +27,14 @@ def create_session(store, **kwargs):
 
 
 class FakeCollectorClient:
-    def __init__(self) -> None:
+    def __init__(self, *, provider: str = "openai_compatible") -> None:
+        self.provider = provider
         self.credentials = []
 
     async def get_ai_config(self, credentials):
         self.credentials.append(credentials)
         return LlmProfile(
-            provider="openai_compatible",
+            provider=self.provider,
             base_url="http://llm.invalid/v1",
             model="local-model",
             api_key=SecretStr("provider-secret"),
@@ -263,3 +266,40 @@ def test_ai_chat_requires_gateway_session_header():
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Missing OpenSVC AI session"
+
+
+def test_ai_chat_rejects_unimplemented_llm_provider():
+    app = create_app()
+    store = InMemoryGatewaySessionStore()
+    collector = FakeCollectorClient(provider="anthropic")
+    mcp = FakeMcpClient()
+    session = create_session(
+        store,
+        username="user-a",
+        password=SecretStr("secret"),
+        ttl_seconds=60,
+    )
+    settings = Settings(
+        OPENSVC_COLLECTOR_API_BASE_URL="https://collector.invalid/init/rest/api"
+    )
+    app.dependency_overrides[get_gateway_session_store] = lambda: store
+    app.dependency_overrides[get_collector_client_provider] = lambda: lambda: collector
+    app.dependency_overrides[get_mcp_client_provider] = lambda: lambda: mcp
+    app.dependency_overrides[get_llm_client_provider] = (
+        lambda: lambda: create_llm_client(settings)
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/ai/chat",
+        headers={"X-OpenSVC-AI-Session": session.session_id},
+        json={"message": "hello"},
+    )
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == {
+        "message": "LLM provider is not supported by this gateway",
+        "provider": "anthropic",
+        "supported_providers": ["openai_compatible"],
+    }
+    assert mcp.list_credentials[0].username == "user-a"
