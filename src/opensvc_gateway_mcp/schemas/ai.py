@@ -18,6 +18,7 @@ LlmProvider = Literal[
     "openai_compatible",
     "anthropic",
     "gemini",
+    "mistral",
     "azure_openai",
 ]
 
