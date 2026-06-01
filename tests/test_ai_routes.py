@@ -13,6 +13,7 @@ from opensvc_gateway_mcp.api.dependencies import (
 from opensvc_gateway_mcp.clients.llm import (
     LlmAssistantMessage,
     LlmChatCompletion,
+    LlmStreamChunk,
     LlmToolCall,
     create_llm_client,
 )
@@ -158,6 +159,25 @@ class FakeLlmClient:
             )
         raise AssertionError("unexpected extra LLM call")
 
+    async def stream_chat(self, *, profile, messages, tools=None):
+        self.calls.append(
+            {
+                "profile": profile,
+                "messages": messages,
+                "tools": tools,
+                "stream": True,
+            }
+        )
+        yield LlmStreamChunk(delta="There are ")
+        yield LlmStreamChunk(delta="4 down nodes.")
+        yield LlmStreamChunk(
+            message=LlmAssistantMessage(
+                content="There are 4 down nodes.",
+                tool_calls=[],
+                raw_tool_calls=[],
+            )
+        )
+
 
 def _completion_with_tool_call(
     *,
@@ -266,6 +286,44 @@ def test_ai_chat_requires_gateway_session_header():
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Missing OpenSVC AI session"
+
+
+def test_ai_chat_stream_returns_sse_deltas_and_done_event():
+    app = create_app()
+    store = InMemoryGatewaySessionStore()
+    collector = FakeCollectorClient()
+    mcp = FakeMcpClient()
+    llm = FakeLlmClient()
+    session = create_session(
+        store,
+        username="user-a",
+        password=SecretStr("secret"),
+        ttl_seconds=60,
+    )
+    app.dependency_overrides[get_gateway_session_store] = lambda: store
+    app.dependency_overrides[get_collector_client_provider] = lambda: lambda: collector
+    app.dependency_overrides[get_mcp_client_provider] = lambda: lambda: mcp
+    app.dependency_overrides[get_llm_client_provider] = lambda: lambda: llm
+    client = TestClient(app)
+
+    with client.stream(
+        "POST",
+        "/api/v1/ai/chat/stream",
+        headers={"X-OpenSVC-AI-Session": session.session_id},
+        json={"message": "How many nodes are down?"},
+    ) as response:
+        body = response.read().decode()
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert 'event: delta\ndata: {"content": "There are "}' in body
+    assert 'event: delta\ndata: {"content": "4 down nodes."}' in body
+    assert "event: done" in body
+    assert '"message": "There are 4 down nodes."' in body
+    assert '"provider": "openai_compatible"' in body
+    assert "provider-secret" not in body
+    assert "secret" not in body
+    assert llm.calls[0]["stream"] is True
 
 
 def test_ai_chat_rejects_unimplemented_llm_provider():

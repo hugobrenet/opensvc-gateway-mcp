@@ -60,3 +60,8 @@ class AiChatResponse(BaseModel):
     provider: str
     model: str
     tool_calls: list[AiToolCallSummary] = Field(default_factory=list)
+
+
+class AiStreamEvent(BaseModel):
+    event: Literal["delta", "tool_call", "done", "error"]
+    data: dict[str, Any]

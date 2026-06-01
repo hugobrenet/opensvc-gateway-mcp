@@ -3,6 +3,7 @@ from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBasicCredentials
 from pydantic import ValidationError
 
@@ -22,6 +23,7 @@ from opensvc_gateway_mcp.clients.llm import (
 from opensvc_gateway_mcp.clients.mcp import McpClient, McpClientError
 from opensvc_gateway_mcp.core.orchestrator import AiOrchestrationError, AiOrchestrator
 from opensvc_gateway_mcp.core.sessions import GatewaySessionStore
+from opensvc_gateway_mcp.core.streaming import stream_ai_sse_events
 from opensvc_gateway_mcp.schemas.ai import AiChatRequest, AiChatResponse
 
 
@@ -125,3 +127,38 @@ async def chat(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
+
+
+@router.post("/chat/stream")
+async def chat_stream(
+    request: AiChatRequest,
+    store: Annotated[GatewaySessionStore, Depends(get_gateway_session_store)],
+    collector_client_provider: Annotated[
+        Callable[[], CollectorClient], Depends(get_collector_client_provider)
+    ],
+    mcp_client_provider: Annotated[
+        Callable[[], McpClient], Depends(get_mcp_client_provider)
+    ],
+    llm_client_provider: Annotated[
+        Callable[[], LlmProviderClient], Depends(get_llm_client_provider)
+    ],
+    x_opensvc_ai_session: Annotated[str | None, Header()] = None,
+) -> StreamingResponse:
+    credentials = await _credentials_from_gateway_session(
+        session_id=x_opensvc_ai_session,
+        store=store,
+    )
+    orchestrator = AiOrchestrator(
+        collector=collector_client_provider(),
+        mcp_client_provider=mcp_client_provider,
+        llm=llm_client_provider(),
+    )
+
+    return StreamingResponse(
+        stream_ai_sse_events(orchestrator, credentials=credentials, request=request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

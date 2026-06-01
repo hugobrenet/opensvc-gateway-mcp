@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -49,6 +50,12 @@ class LlmChatCompletion:
     message: LlmAssistantMessage
 
 
+@dataclass(frozen=True)
+class LlmStreamChunk:
+    delta: str = ""
+    message: LlmAssistantMessage | None = None
+
+
 class LlmProviderClient(Protocol):
     async def chat(
         self,
@@ -57,4 +64,13 @@ class LlmProviderClient(Protocol):
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
     ) -> LlmChatCompletion:
+        ...
+
+    def stream_chat(
+        self,
+        *,
+        profile: LlmProfile,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+    ) -> AsyncIterator[LlmStreamChunk]:
         ...

@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
@@ -5,6 +6,7 @@ import httpx
 from opensvc_gateway_mcp.clients.llm.base import (
     LlmChatCompletion,
     LlmProviderClient,
+    LlmStreamChunk,
     UnsupportedLlmProvider,
 )
 from opensvc_gateway_mcp.clients.llm.openai_compatible import OpenAICompatibleLlmClient
@@ -34,6 +36,21 @@ class LlmProviderRouter:
                 supported_providers=self.supported_providers,
             )
         return await client.chat(profile=profile, messages=messages, tools=tools)
+
+    def stream_chat(
+        self,
+        *,
+        profile: LlmProfile,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None = None,
+    ) -> AsyncIterator[LlmStreamChunk]:
+        client = self.clients.get(profile.provider)
+        if client is None:
+            raise UnsupportedLlmProvider(
+                profile.provider,
+                supported_providers=self.supported_providers,
+            )
+        return client.stream_chat(profile=profile, messages=messages, tools=tools)
 
 
 def create_llm_client(
