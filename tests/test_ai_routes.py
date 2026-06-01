@@ -208,81 +208,14 @@ def _completion_with_tool_call(
     )
 
 
-def test_ai_chat_orchestrates_llm_search_and_call_tool():
-    app = create_app()
-    store = InMemoryGatewaySessionStore()
-    collector = FakeCollectorClient()
-    mcp = FakeMcpClient()
-    llm = FakeLlmClient()
-    session = create_session(
-        store,
-        username="user-a",
-        password=SecretStr("secret"),
-        ttl_seconds=60,
-    )
-    app.dependency_overrides[get_gateway_session_store] = lambda: store
-    app.dependency_overrides[get_collector_client_provider] = lambda: lambda: collector
-    app.dependency_overrides[get_mcp_client_provider] = lambda: lambda: mcp
-    app.dependency_overrides[get_llm_client_provider] = lambda: lambda: llm
-    client = TestClient(app)
-
-    response = client.post(
-        "/api/v1/ai/chat",
-        headers={"X-OpenSVC-AI-Session": session.session_id},
-        json={"message": "How many nodes are down?"},
-    )
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "message": "There are 4 down nodes.",
-        "provider": "openai_compatible",
-        "model": "local-model",
-        "tool_calls": [
-            {
-                "name": "search_tools",
-                "arguments": {"query": "count nodes status down"},
-                "ok": True,
-            },
-            {
-                "name": "call_tool",
-                "arguments": {
-                    "name": "count_nodes",
-                    "arguments": {"request": {"status": "down"}},
-                },
-                "ok": True,
-            },
-        ],
-    }
-    assert collector.credentials[0].username == "user-a"
-    assert mcp.list_credentials[0].password == "secret"
-    assert [call["name"] for call in mcp.tool_calls] == [
-        "search_tools",
-        "call_tool",
-    ]
-    first_llm_tools = llm.calls[0]["tools"]
-    assert [tool["function"]["name"] for tool in first_llm_tools] == [
-        "search_tools",
-        "call_tool",
-    ]
-    call_tool = first_llm_tools[1]["function"]
-    assert '"arguments":{"request":{"nodename":"node1"}}' in call_tool["description"]
-    assert '"request":{"nodename":"node1"}' in call_tool["description"]
-    assert "Do not put target tool fields at the top level" in (
-        call_tool["parameters"]["properties"]["arguments"]["description"]
-    )
-    assert "count_nodes" not in str(first_llm_tools)
-    assert "provider-secret" not in response.text
-    assert "secret" not in response.text
-
-
-def test_ai_chat_requires_gateway_session_header():
+def test_ai_chat_stream_requires_gateway_session_header():
     app = create_app()
     app.dependency_overrides[get_gateway_session_store] = (
         lambda: InMemoryGatewaySessionStore()
     )
     client = TestClient(app)
 
-    response = client.post("/api/v1/ai/chat", json={"message": "hello"})
+    response = client.post("/api/v1/ai/chat/stream", json={"message": "hello"})
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Missing OpenSVC AI session"
@@ -326,7 +259,7 @@ def test_ai_chat_stream_returns_sse_deltas_and_done_event():
     assert llm.calls[0]["stream"] is True
 
 
-def test_ai_chat_rejects_unimplemented_llm_provider():
+def test_ai_chat_stream_rejects_unimplemented_llm_provider():
     app = create_app()
     store = InMemoryGatewaySessionStore()
     collector = FakeCollectorClient(provider="anthropic")
@@ -348,16 +281,17 @@ def test_ai_chat_rejects_unimplemented_llm_provider():
     )
     client = TestClient(app)
 
-    response = client.post(
-        "/api/v1/ai/chat",
+    with client.stream(
+        "POST",
+        "/api/v1/ai/chat/stream",
         headers={"X-OpenSVC-AI-Session": session.session_id},
         json={"message": "hello"},
-    )
+    ) as response:
+        body = response.read().decode()
 
-    assert response.status_code == 502
-    assert response.json()["detail"] == {
-        "message": "LLM provider is not supported by this gateway",
-        "provider": "anthropic",
-        "supported_providers": ["openai_compatible"],
-    }
+    assert response.status_code == 200
+    assert "event: error" in body
+    assert "LLM provider is not supported by this gateway" in body
+    assert '"provider": "anthropic"' in body
+    assert '"supported_providers": ["openai_compatible"]' in body
     assert mcp.list_credentials[0].username == "user-a"
