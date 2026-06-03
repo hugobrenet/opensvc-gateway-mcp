@@ -46,26 +46,12 @@ class LlmAssistantMessage:
 
 
 @dataclass(frozen=True)
-class LlmChatCompletion:
-    message: LlmAssistantMessage
-
-
-@dataclass(frozen=True)
 class LlmStreamChunk:
     delta: str = ""
     message: LlmAssistantMessage | None = None
 
 
 class LlmProviderClient(Protocol):
-    async def chat(
-        self,
-        *,
-        profile: LlmProfile,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]] | None = None,
-    ) -> LlmChatCompletion:
-        ...
-
     def stream_chat(
         self,
         *,

@@ -12,7 +12,6 @@ from opensvc_gateway_mcp.api.dependencies import (
 )
 from opensvc_gateway_mcp.clients.llm import (
     LlmAssistantMessage,
-    LlmChatCompletion,
     LlmStreamChunk,
     LlmToolCall,
     create_llm_client,
@@ -123,45 +122,6 @@ class FakeLlmClient:
     def __init__(self) -> None:
         self.calls = []
 
-    async def chat(self, *, profile, messages, tools=None):
-        self.calls.append(
-            {
-                "profile": profile,
-                "messages": messages,
-                "tools": tools,
-            }
-        )
-        if len(self.calls) == 1:
-            return _completion_with_tool_call(
-                call_id="search-1",
-                name="search_tools",
-                arguments={"query": "count nodes status down"},
-            )
-        if len(self.calls) == 2:
-            assert any(message["role"] == "tool" for message in messages)
-            return _completion_with_tool_call(
-                call_id="call-1",
-                name="call_tool",
-                arguments={
-                    "name": "count_nodes",
-                    "arguments": {"request": {"status": "down"}},
-                },
-            )
-        if len(self.calls) == 3:
-            assert any(
-                '"count": 4' in message.get("content", "")
-                for message in messages
-                if message["role"] == "tool"
-            )
-            return LlmChatCompletion(
-                message=LlmAssistantMessage(
-                    content="There are 4 down nodes.",
-                    tool_calls=[],
-                    raw_tool_calls=[],
-                )
-            )
-        raise AssertionError("unexpected extra LLM call")
-
     async def stream_chat(self, *, profile, messages, tools=None):
         self.calls.append(
             {
@@ -197,23 +157,23 @@ class FakeStreamingToolLlmClient:
         )
         if len(self.calls) == 1:
             yield LlmStreamChunk(
-                message=_completion_with_tool_call(
+                message=_assistant_message_with_tool_call(
                     call_id="search-1",
                     name="search_tools",
                     arguments={"query": "count nodes status down"},
-                ).message
+                )
             )
             return
         if len(self.calls) == 2:
             yield LlmStreamChunk(
-                message=_completion_with_tool_call(
+                message=_assistant_message_with_tool_call(
                     call_id="call-1",
                     name="call_tool",
                     arguments={
                         "name": "count_nodes",
                         "arguments": {"request": {"status": "down"}},
                     },
-                ).message
+                )
             )
             return
         if len(self.calls) == 3:
@@ -228,12 +188,12 @@ class FakeStreamingToolLlmClient:
         raise AssertionError("unexpected extra streaming LLM call")
 
 
-def _completion_with_tool_call(
+def _assistant_message_with_tool_call(
     *,
     call_id: str,
     name: str,
     arguments: dict,
-) -> LlmChatCompletion:
+) -> LlmAssistantMessage:
     raw_tool_call = {
         "id": call_id,
         "type": "function",
@@ -242,18 +202,16 @@ def _completion_with_tool_call(
             "arguments": json.dumps(arguments),
         },
     }
-    return LlmChatCompletion(
-        message=LlmAssistantMessage(
-            content="",
-            tool_calls=[
-                LlmToolCall(
-                    id=call_id,
-                    name=name,
-                    arguments=arguments,
-                )
-            ],
-            raw_tool_calls=[raw_tool_call],
-        )
+    return LlmAssistantMessage(
+        content="",
+        tool_calls=[
+            LlmToolCall(
+                id=call_id,
+                name=name,
+                arguments=arguments,
+            )
+        ],
+        raw_tool_calls=[raw_tool_call],
     )
 
 

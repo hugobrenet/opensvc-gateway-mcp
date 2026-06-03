@@ -1,6 +1,5 @@
 from opensvc_gateway_mcp.clients.llm.base import (
     LlmAssistantMessage,
-    LlmChatCompletion,
     LlmClientError,
     LlmHttpError,
     LlmProtocolError,
@@ -18,7 +17,6 @@ from opensvc_gateway_mcp.clients.llm.openai_compatible import OpenAICompatibleLl
 
 __all__ = [
     "LlmAssistantMessage",
-    "LlmChatCompletion",
     "LlmClientError",
     "LlmHttpError",
     "LlmProtocolError",
