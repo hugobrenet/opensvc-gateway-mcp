@@ -1,6 +1,7 @@
 import json
 from collections.abc import Callable
 from typing import Any
+from uuid import uuid4
 
 from fastapi.security import HTTPBasicCredentials
 
@@ -135,9 +136,10 @@ class AiOrchestrator:
         credentials: HTTPBasicCredentials,
         request: AiChatRequest,
     ):
+        request_id = _new_ai_request_id()
         profile = await self.collector.get_ai_config(credentials)
         mcp = self.mcp_client_provider()
-        tools_result = await mcp.list_tools(credentials)
+        tools_result = await mcp.list_tools(credentials, request_id=request_id)
         tools = _mcp_tools_to_openai_tools(
             tools_result,
             allowed_names=LLM_VISIBLE_MCP_TOOLS,
@@ -215,6 +217,7 @@ class AiOrchestrator:
                         credentials,
                         name=tool_call.name,
                         arguments=tool_call.arguments,
+                        request_id=request_id,
                     )
                     tool_result = result
                     ok = not bool(result.get("isError"))
@@ -254,6 +257,10 @@ def _initial_messages(
         messages.append({"role": message.role, "content": message.content})
     messages.append({"role": "user", "content": request.message})
     return messages
+
+
+def _new_ai_request_id() -> str:
+    return f"ai_{uuid4().hex}"
 
 
 def _mcp_tools_to_openai_tools(

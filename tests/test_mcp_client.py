@@ -72,15 +72,17 @@ class FakeFastMcpClient:
 
 def test_mcp_client_list_tools_uses_native_client_context():
     credentials_seen = []
+    request_ids_seen = []
     native_client = FakeFastMcpClient()
 
-    def factory(credentials):
+    def factory(credentials, request_id=None):
         credentials_seen.append(credentials)
+        request_ids_seen.append(request_id)
         return native_client
 
     client = McpClient(_settings(), client_factory=factory)
 
-    result = asyncio.run(client.list_tools(_credentials()))
+    result = asyncio.run(client.list_tools(_credentials(), request_id="ai_test"))
 
     assert [tool["name"] for tool in result["tools"]] == [
         "search_tools",
@@ -88,19 +90,27 @@ def test_mcp_client_list_tools_uses_native_client_context():
     ]
     assert credentials_seen[0].username == "user-a"
     assert credentials_seen[0].password == "secret"
+    assert request_ids_seen == ["ai_test"]
     assert native_client.entered is True
     assert native_client.exited is True
 
 
 def test_mcp_client_call_tool_sends_name_and_arguments():
     native_client = FakeFastMcpClient()
-    client = McpClient(_settings(), client_factory=lambda credentials: native_client)
+    request_ids_seen = []
+
+    def factory(credentials, request_id=None):
+        request_ids_seen.append(request_id)
+        return native_client
+
+    client = McpClient(_settings(), client_factory=factory)
 
     result = asyncio.run(
         client.call_tool(
             _credentials(),
             name="count_nodes",
             arguments={"request": {"filters": {"asset_env": "lab"}}},
+            request_id="ai_call",
         )
     )
 
@@ -115,6 +125,19 @@ def test_mcp_client_call_tool_sends_name_and_arguments():
             "arguments": {"request": {"filters": {"asset_env": "lab"}}},
         }
     ]
+    assert request_ids_seen == ["ai_call"]
+
+
+def test_mcp_client_builds_transport_with_request_id_header():
+    client = McpClient(_settings())
+
+    native_client = client._build_fastmcp_client(  # noqa: SLF001
+        _credentials(),
+        request_id="ai_header",
+    )
+
+    headers = native_client.transport.headers
+    assert headers["X-OpenSVC-AI-Request-ID"] == "ai_header"
 
 
 def test_mcp_client_raises_json_rpc_error_without_exposing_credentials():
@@ -126,7 +149,10 @@ def test_mcp_client_raises_json_rpc_error_without_exposing_credentials():
             )
         )
     )
-    client = McpClient(_settings(), client_factory=lambda credentials: native_client)
+    client = McpClient(
+        _settings(),
+        client_factory=lambda credentials, request_id=None: native_client,
+    )
 
     with pytest.raises(McpJsonRpcError) as exc_info:
         asyncio.run(client.list_tools(_credentials()))
@@ -138,7 +164,10 @@ def test_mcp_client_raises_json_rpc_error_without_exposing_credentials():
 
 def test_mcp_client_wraps_httpx_transport_errors_without_exposing_credentials():
     native_client = FakeFastMcpClient(exc=httpx.ReadTimeout("timed out"))
-    client = McpClient(_settings(), client_factory=lambda credentials: native_client)
+    client = McpClient(
+        _settings(),
+        client_factory=lambda credentials, request_id=None: native_client,
+    )
 
     with pytest.raises(McpTransportError) as exc_info:
         asyncio.run(client.list_tools(_credentials()))

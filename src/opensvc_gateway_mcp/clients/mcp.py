@@ -61,7 +61,10 @@ class FastMcpClientProtocol(Protocol):
     ) -> CallToolResult: ...
 
 
-FastMcpClientFactory = Callable[[HTTPBasicCredentials], FastMcpClientProtocol]
+FastMcpClientFactory = Callable[
+    [HTTPBasicCredentials, str | None],
+    FastMcpClientProtocol,
+]
 
 
 class McpClient:
@@ -76,9 +79,11 @@ class McpClient:
     async def list_tools(
         self,
         credentials: HTTPBasicCredentials,
+        *,
+        request_id: str | None = None,
     ) -> dict[str, Any]:
         try:
-            async with self._client_factory(credentials) as client:
+            async with self._client_factory(credentials, request_id) as client:
                 result = await client.list_tools_mcp()
         except McpError as exc:
             raise _json_rpc_error_from_mcp_error(exc) from exc
@@ -98,9 +103,10 @@ class McpClient:
         *,
         name: str,
         arguments: dict[str, Any] | None = None,
+        request_id: str | None = None,
     ) -> dict[str, Any]:
         try:
-            async with self._client_factory(credentials) as client:
+            async with self._client_factory(credentials, request_id) as client:
                 result = await client.call_tool_mcp(name, arguments or {})
         except McpError as exc:
             raise _json_rpc_error_from_mcp_error(exc) from exc
@@ -117,9 +123,14 @@ class McpClient:
     def _build_fastmcp_client(
         self,
         credentials: HTTPBasicCredentials,
+        request_id: str | None = None,
     ) -> FastMcpClientProtocol:
+        headers = {}
+        if request_id is not None:
+            headers["X-OpenSVC-AI-Request-ID"] = request_id
         transport = StreamableHttpTransport(
             url=self.settings.mcp_url,
+            headers=headers or None,
             auth=httpx.BasicAuth(credentials.username, credentials.password),
         )
         return FastMcpClient(
