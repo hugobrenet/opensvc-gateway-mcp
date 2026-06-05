@@ -9,7 +9,7 @@ from opensvc_gateway_mcp.api.dependencies import (
     get_mcp_client_provider,
 )
 from opensvc_gateway_mcp.clients.mcp import McpClientError, McpJsonRpcError
-from opensvc_gateway_mcp.core.sessions import InMemoryGatewaySessionStore
+from tests.fakes import FakeGatewaySessionStore
 from opensvc_gateway_mcp.main import create_app
 
 
@@ -118,7 +118,7 @@ class FakeMcpClient:
 def test_mcp_tools_requires_gateway_session_header():
     app = create_app()
     app.dependency_overrides[get_gateway_session_store] = (
-        lambda: InMemoryGatewaySessionStore()
+        lambda: FakeGatewaySessionStore()
     )
     client = TestClient(app)
 
@@ -131,7 +131,7 @@ def test_mcp_tools_requires_gateway_session_header():
 def test_mcp_tools_rejects_unknown_gateway_session():
     app = create_app()
     app.dependency_overrides[get_gateway_session_store] = (
-        lambda: InMemoryGatewaySessionStore()
+        lambda: FakeGatewaySessionStore()
     )
     client = TestClient(app)
 
@@ -146,7 +146,7 @@ def test_mcp_tools_rejects_unknown_gateway_session():
 
 def test_mcp_tools_uses_gateway_session_credentials():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     mcp = FakeMcpClient()
     session = create_session(
         store,
@@ -177,7 +177,7 @@ def test_mcp_tools_uses_gateway_session_credentials():
 
 def test_mcp_tools_maps_mcp_client_error():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     session = create_session(
         store,
         username="user-a",
@@ -202,7 +202,7 @@ def test_mcp_tools_maps_mcp_client_error():
 
 def test_mcp_tools_search_calls_search_tools_with_query():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     mcp = FakeMcpClient()
     session = create_session(
         store,
@@ -241,7 +241,7 @@ def test_mcp_tools_search_calls_search_tools_with_query():
 
 def test_mcp_tools_search_requires_non_empty_query():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     session = create_session(
         store,
         username="user-a",
@@ -262,7 +262,7 @@ def test_mcp_tools_search_requires_non_empty_query():
 
 def test_mcp_tools_search_maps_mcp_client_error():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     session = create_session(
         store,
         username="user-a",
@@ -288,7 +288,7 @@ def test_mcp_tools_search_maps_mcp_client_error():
 
 def test_mcp_tools_call_uses_call_tool_proxy():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     mcp = FakeMcpClient()
     session = create_session(
         store,
@@ -329,7 +329,7 @@ def test_mcp_tools_call_uses_call_tool_proxy():
 
 def test_mcp_tools_call_defaults_arguments_to_empty_object():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     mcp = FakeMcpClient()
     session = create_session(
         store,
@@ -356,7 +356,7 @@ def test_mcp_tools_call_defaults_arguments_to_empty_object():
 
 def test_mcp_tools_call_requires_non_empty_name():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     session = create_session(
         store,
         username="user-a",
@@ -377,7 +377,7 @@ def test_mcp_tools_call_requires_non_empty_name():
 
 def test_mcp_tools_call_maps_mcp_client_error():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     session = create_session(
         store,
         username="user-a",
@@ -403,7 +403,7 @@ def test_mcp_tools_call_maps_mcp_client_error():
 
 def test_mcp_tools_call_preserves_json_rpc_validation_error():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     session = create_session(
         store,
         username="user-a",
@@ -434,7 +434,7 @@ def test_mcp_tools_call_preserves_json_rpc_validation_error():
 
 def test_mcp_tools_call_maps_proxied_tool_validation_result_to_422():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     session = create_session(
         store,
         username="user-a",

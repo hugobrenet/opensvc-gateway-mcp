@@ -13,11 +13,9 @@ from opensvc_gateway_mcp.clients.collector import (
     InvalidCollectorCredentials,
 )
 from opensvc_gateway_mcp.config import Settings, get_settings
-from opensvc_gateway_mcp.core.sessions import (
-    InMemoryGatewaySessionStore,
-    RedisGatewaySessionStore,
-)
+from opensvc_gateway_mcp.core.sessions import RedisGatewaySessionStore
 from opensvc_gateway_mcp.main import create_app
+from tests.fakes import FakeGatewaySessionStore
 
 
 def create_session(store, **kwargs):
@@ -79,7 +77,7 @@ def test_internal_session_requires_gateway_token():
 def test_internal_session_validates_collector_credentials_and_stores_session():
     app = create_app()
     collector = FakeCollectorClient()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     app.dependency_overrides[get_settings] = lambda: Settings(
         OPENSVC_COLLECTOR_API_BASE_URL="https://collector.invalid/init/rest/api",
         OPENSVC_GATEWAY_INTERNAL_TOKEN="expected-token",
@@ -120,7 +118,7 @@ def test_internal_session_rejects_invalid_collector_credentials():
         lambda: FakeCollectorClient(reject=True)
     )
     app.dependency_overrides[get_gateway_session_store] = (
-        lambda: InMemoryGatewaySessionStore()
+        lambda: FakeGatewaySessionStore()
     )
     client = TestClient(app)
 
@@ -137,7 +135,7 @@ def test_internal_session_rejects_invalid_collector_credentials():
 def test_internal_session_accepts_requested_ttl():
     app = create_app()
     collector = FakeCollectorClient()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     app.dependency_overrides[get_settings] = lambda: Settings(
         OPENSVC_COLLECTOR_API_BASE_URL="https://collector.invalid/init/rest/api",
         OPENSVC_GATEWAY_INTERNAL_TOKEN="expected-token",
@@ -163,7 +161,7 @@ def test_internal_session_accepts_requested_ttl():
 
 def test_internal_session_delete_removes_session():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     session = create_session(
         store,
         username="user-a",

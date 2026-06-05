@@ -25,46 +25,6 @@ class GatewaySessionStore(Protocol):
     async def get(self, session_id: str) -> GatewaySession | None: ...
 
 
-class InMemoryGatewaySessionStore:
-    def __init__(self) -> None:
-        self._sessions: dict[str, GatewaySession] = {}
-
-    async def create(
-        self, *, username: str, password: SecretStr, ttl_seconds: int
-    ) -> GatewaySession:
-        self.cleanup_expired()
-        session = GatewaySession(
-            session_id=token_urlsafe(32),
-            username=username,
-            password=password,
-            expires_at=datetime.now(UTC) + timedelta(seconds=ttl_seconds),
-        )
-        self._sessions[session.session_id] = session
-        return session
-
-    async def delete(self, session_id: str) -> bool:
-        return self._sessions.pop(session_id, None) is not None
-
-    async def get(self, session_id: str) -> GatewaySession | None:
-        session = self._sessions.get(session_id)
-        if session is None:
-            return None
-        if session.expires_at <= datetime.now(UTC):
-            await self.delete(session_id)
-            return None
-        return session
-
-    def cleanup_expired(self) -> None:
-        now = datetime.now(UTC)
-        expired = [
-            session_id
-            for session_id, session in self._sessions.items()
-            if session.expires_at <= now
-        ]
-        for session_id in expired:
-            self._sessions.pop(session_id, None)
-
-
 class RedisGatewaySessionStore:
     def __init__(
         self,

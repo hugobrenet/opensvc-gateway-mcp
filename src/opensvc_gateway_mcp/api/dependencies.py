@@ -7,7 +7,6 @@ from opensvc_gateway_mcp.clients.mcp import McpClient
 from opensvc_gateway_mcp.config import get_settings
 from opensvc_gateway_mcp.core.sessions import (
     GatewaySessionStore,
-    InMemoryGatewaySessionStore,
     RedisGatewaySessionStore,
 )
 
@@ -39,9 +38,7 @@ def get_llm_client_provider() -> Callable[[], LlmProviderClient]:
 @lru_cache
 def get_gateway_session_store() -> GatewaySessionStore:
     settings = get_settings()
-    if settings.gateway_session_store == "redis":
-        return RedisGatewaySessionStore(
-            redis_url=settings.gateway_redis_url,
-            key_prefix=settings.gateway_redis_key_prefix,
-        )
-    return InMemoryGatewaySessionStore()
+    return RedisGatewaySessionStore(
+        redis_url=settings.gateway_redis_url,
+        key_prefix=settings.gateway_redis_key_prefix,
+    )

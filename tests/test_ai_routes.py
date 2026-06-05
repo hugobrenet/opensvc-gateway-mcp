@@ -17,7 +17,7 @@ from opensvc_gateway_mcp.clients.llm import (
     create_llm_client,
 )
 from opensvc_gateway_mcp.config import Settings
-from opensvc_gateway_mcp.core.sessions import InMemoryGatewaySessionStore
+from tests.fakes import FakeGatewaySessionStore
 from opensvc_gateway_mcp.main import create_app
 from opensvc_gateway_mcp.schemas.ai import LlmProfile
 
@@ -218,7 +218,7 @@ def _assistant_message_with_tool_call(
 def test_ai_chat_stream_requires_gateway_session_header():
     app = create_app()
     app.dependency_overrides[get_gateway_session_store] = (
-        lambda: InMemoryGatewaySessionStore()
+        lambda: FakeGatewaySessionStore()
     )
     client = TestClient(app)
 
@@ -230,7 +230,7 @@ def test_ai_chat_stream_requires_gateway_session_header():
 
 def test_ai_chat_stream_returns_sse_deltas_and_done_event():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     collector = FakeCollectorClient()
     mcp = FakeMcpClient()
     llm = FakeLlmClient()
@@ -270,7 +270,7 @@ def test_ai_chat_stream_returns_sse_deltas_and_done_event():
 
 def test_ai_chat_stream_reuses_request_id_for_mcp_tool_calls():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     collector = FakeCollectorClient()
     mcp = FakeMcpClient()
     llm = FakeStreamingToolLlmClient()
@@ -308,7 +308,7 @@ def test_ai_chat_stream_reuses_request_id_for_mcp_tool_calls():
 
 def test_ai_chat_stream_rejects_unimplemented_llm_provider():
     app = create_app()
-    store = InMemoryGatewaySessionStore()
+    store = FakeGatewaySessionStore()
     collector = FakeCollectorClient(provider="anthropic")
     mcp = FakeMcpClient()
     session = create_session(
