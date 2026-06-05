@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import FastAPI
 
+from opensvc_gateway_mcp.api.error_handlers import register_error_handlers
 from opensvc_gateway_mcp.api.router import api_router
 from opensvc_gateway_mcp.config import get_settings
 
@@ -13,6 +14,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
     )
+    register_error_handlers(app)
     app.include_router(api_router)
     return app
 
