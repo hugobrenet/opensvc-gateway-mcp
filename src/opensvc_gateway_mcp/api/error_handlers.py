@@ -86,10 +86,7 @@ async def _mcp_proxy_tool_validation_error(
 
 
 def _mcp_json_rpc_error_detail(exc: McpProxyJsonRpcError) -> dict[str, Any]:
-    detail = {
+    return {
         "message": exc.message,
         "code": exc.code,
     }
-    if exc.data is not None:
-        detail["data"] = exc.data
-    return detail

@@ -401,7 +401,7 @@ def test_mcp_tools_call_maps_mcp_client_error():
     assert "secret" not in response.text
 
 
-def test_mcp_tools_call_preserves_json_rpc_validation_error():
+def test_mcp_tools_call_hides_json_rpc_error_data():
     app = create_app()
     store = FakeGatewaySessionStore()
     session = create_session(
@@ -426,9 +426,9 @@ def test_mcp_tools_call_preserves_json_rpc_validation_error():
     detail = response.json()["detail"]
     assert detail["code"] == -32602
     assert detail["message"] == "Validation error calling get_cluster_nodes"
-    assert detail["data"]["tool"] == "get_cluster_nodes"
-    assert "expected_input_schema" in detail["data"]
-    assert "cluster_name" in str(detail["data"])
+    assert "data" not in detail
+    assert "expected_input_schema" not in response.text
+    assert "cluster_name" not in response.text
     assert "secret" not in response.text
 
 
