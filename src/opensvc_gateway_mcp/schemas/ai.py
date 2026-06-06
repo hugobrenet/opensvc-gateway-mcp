@@ -51,7 +51,6 @@ class LlmProfile(BaseModel):
 
 class AiToolCallSummary(BaseModel):
     name: str
-    arguments: dict[str, Any]
     ok: bool
 
 

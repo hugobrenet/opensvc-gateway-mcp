@@ -296,6 +296,10 @@ def test_ai_chat_stream_reuses_request_id_for_mcp_tool_calls():
 
     assert response.status_code == 200
     assert "event: done" in body
+    assert 'event: tool_call\ndata: {"name": "count_nodes", "ok": true}' in body
+    assert '"arguments"' not in body
+    assert '"request"' not in body
+    assert '"status": "down"' not in body
     assert len(mcp.list_request_ids) == 1
     request_id = mcp.list_request_ids[0]
     assert request_id.startswith("ai_")
@@ -303,6 +307,10 @@ def test_ai_chat_stream_reuses_request_id_for_mcp_tool_calls():
         "search_tools",
         "call_tool",
     ]
+    assert mcp.tool_calls[1]["arguments"] == {
+        "name": "count_nodes",
+        "arguments": {"request": {"status": "down"}},
+    }
     assert {call["request_id"] for call in mcp.tool_calls} == {request_id}
 
 

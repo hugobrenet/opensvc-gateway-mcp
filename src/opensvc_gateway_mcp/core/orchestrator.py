@@ -129,8 +129,7 @@ class AiOrchestrator:
                     ok = not bool(result.get("isError"))
 
                 summary = AiToolCallSummary(
-                    name=tool_call.name,
-                    arguments=tool_call.arguments,
+                    name=_tool_call_summary_name(tool_call.name, tool_call.arguments),
                     ok=ok,
                 )
                 tool_summaries.append(summary)
@@ -167,6 +166,16 @@ def _initial_messages(
 
 def _new_ai_request_id() -> str:
     return f"ai_{uuid4().hex}"
+
+
+def _tool_call_summary_name(name: str, arguments: dict[str, Any]) -> str:
+    if name != "call_tool":
+        return name
+
+    target_name = arguments.get("name")
+    if isinstance(target_name, str) and target_name.strip():
+        return target_name.strip()
+    return name
 
 
 def _mcp_tools_to_openai_tools(
