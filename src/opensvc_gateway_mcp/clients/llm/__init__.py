@@ -13,9 +13,11 @@ from opensvc_gateway_mcp.clients.llm.factory import (
     LlmProviderRouter,
     create_llm_client,
 )
+from opensvc_gateway_mcp.clients.llm.anthropic import AnthropicLlmClient
 from opensvc_gateway_mcp.clients.llm.openai_compatible import OpenAICompatibleLlmClient
 
 __all__ = [
+    "AnthropicLlmClient",
     "LlmAssistantMessage",
     "LlmClientError",
     "LlmHttpError",

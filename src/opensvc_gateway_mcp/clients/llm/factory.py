@@ -8,6 +8,7 @@ from opensvc_gateway_mcp.clients.llm.base import (
     LlmStreamChunk,
     UnsupportedLlmProvider,
 )
+from opensvc_gateway_mcp.clients.llm.anthropic import AnthropicLlmClient
 from opensvc_gateway_mcp.clients.llm.openai_compatible import OpenAICompatibleLlmClient
 from opensvc_gateway_mcp.config import Settings
 from opensvc_gateway_mcp.schemas.ai import LlmProfile
@@ -44,6 +45,10 @@ def create_llm_client(
 ) -> LlmProviderClient:
     return LlmProviderRouter(
         {
+            "anthropic": AnthropicLlmClient(
+                settings,
+                transport=transport,
+            ),
             "openai_compatible": OpenAICompatibleLlmClient(
                 settings,
                 transport=transport,

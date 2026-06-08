@@ -317,7 +317,7 @@ def test_ai_chat_stream_reuses_request_id_for_mcp_tool_calls():
 def test_ai_chat_stream_rejects_unimplemented_llm_provider():
     app = create_app()
     store = FakeGatewaySessionStore()
-    collector = FakeCollectorClient(provider="anthropic")
+    collector = FakeCollectorClient(provider="mistral")
     mcp = FakeMcpClient()
     session = create_session(
         store,
@@ -347,6 +347,6 @@ def test_ai_chat_stream_rejects_unimplemented_llm_provider():
     assert response.status_code == 200
     assert "event: error" in body
     assert "LLM provider is not supported by this gateway" in body
-    assert '"provider": "anthropic"' in body
-    assert '"supported_providers": ["openai_compatible"]' in body
+    assert '"provider": "mistral"' in body
+    assert '"supported_providers": ["anthropic", "openai_compatible"]' in body
     assert mcp.list_credentials[0].username == "user-a"
