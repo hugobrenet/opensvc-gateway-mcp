@@ -267,6 +267,19 @@ The LLM only sees the two MCP proxy tools, `search_tools` and `call_tool`. It
 must search the tool catalog first, then call a selected Collector tool through
 the proxy.
 
+### State-Changing Tool Confirmation
+
+State-changing MCP tools expose a required `request.confirmation.phrase` field
+in their input schema. The assistant must generate the phrase after resolving
+and summarizing the target action, ask the user to repeat it verbatim, and only
+then call `call_tool` with that same phrase.
+
+Before forwarding a proxied `call_tool`, the gateway checks this generic field
+when present. The phrase must be a non-empty string and must appear verbatim in
+the latest user message for the current request. The gateway does not inspect
+tool-specific business fields and does not perform extra MCP lookups for this
+check; MCP schemas make the field mandatory for write/delete tools.
+
 ## Tests
 
 ```bash

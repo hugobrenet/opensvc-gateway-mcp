@@ -119,14 +119,23 @@ class AiOrchestrator:
                     }
                     ok = False
                 else:
-                    result = await mcp.call_tool(
-                        credentials,
-                        name=tool_call.name,
-                        arguments=tool_call.arguments,
-                        request_id=request_id,
+                    blocked_result = _blocked_confirmation_result(
+                        latest_user_message=request.message,
+                        proxy_tool_name=tool_call.name,
+                        proxy_arguments=tool_call.arguments,
                     )
-                    tool_result = result
-                    ok = not bool(result.get("isError"))
+                    if blocked_result is not None:
+                        tool_result = blocked_result
+                        ok = False
+                    else:
+                        result = await mcp.call_tool(
+                            credentials,
+                            name=tool_call.name,
+                            arguments=tool_call.arguments,
+                            request_id=request_id,
+                        )
+                        tool_result = result
+                        ok = not bool(result.get("isError"))
 
                 summary = AiToolCallSummary(
                     name=_tool_call_summary_name(tool_call.name, tool_call.arguments),
@@ -176,6 +185,65 @@ def _tool_call_summary_name(name: str, arguments: dict[str, Any]) -> str:
     if isinstance(target_name, str) and target_name.strip():
         return target_name.strip()
     return name
+
+
+def _blocked_confirmation_result(
+    *,
+    latest_user_message: str,
+    proxy_tool_name: str,
+    proxy_arguments: dict[str, Any],
+) -> dict[str, Any] | None:
+    if proxy_tool_name != "call_tool":
+        return None
+
+    target_arguments = proxy_arguments.get("arguments")
+    if not isinstance(target_arguments, dict):
+        return None
+
+    request_payload = target_arguments.get("request")
+    if not isinstance(request_payload, dict):
+        return None
+
+    confirmation = request_payload.get("confirmation")
+    if confirmation is None:
+        return None
+    if not isinstance(confirmation, dict):
+        return _confirmation_error(
+            "request.confirmation must be an object containing phrase"
+        )
+
+    phrase = confirmation.get("phrase")
+    if not isinstance(phrase, str) or not phrase.strip():
+        return _confirmation_error(
+            "request.confirmation.phrase must be a non-empty string"
+        )
+
+    phrase = phrase.strip()
+    if phrase not in latest_user_message:
+        return _confirmation_error(
+            "request.confirmation.phrase must appear verbatim in the latest "
+            "user message before the gateway forwards this state-changing tool"
+        )
+
+    return None
+
+
+def _confirmation_error(message: str) -> dict[str, Any]:
+    return {
+        "isError": True,
+        "content": [
+            {
+                "type": "text",
+                "text": json.dumps(
+                    {
+                        "error": "state_changing_tool_confirmation_required",
+                        "message": message,
+                    },
+                    ensure_ascii=False,
+                ),
+            }
+        ],
+    }
 
 
 def _mcp_tools_to_openai_tools(

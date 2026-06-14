@@ -188,6 +188,52 @@ class FakeStreamingToolLlmClient:
         raise AssertionError("unexpected extra streaming LLM call")
 
 
+class FakeConfirmationToolLlmClient:
+    def __init__(self) -> None:
+        self.calls = []
+
+    async def stream_chat(self, *, profile, messages, tools=None):
+        self.calls.append(
+            {
+                "profile": profile,
+                "messages": messages,
+                "tools": tools,
+                "stream": True,
+            }
+        )
+        if len(self.calls) == 1:
+            yield LlmStreamChunk(
+                message=_assistant_message_with_tool_call(
+                    call_id="delete-1",
+                    name="call_tool",
+                    arguments={
+                        "name": "delete_node",
+                        "arguments": {
+                            "request": {
+                                "node_id": "node-id-1",
+                                "confirm_node_id": "node-id-1",
+                                "confirm_nodename": "node-a",
+                                "confirmation": {
+                                    "phrase": "DELETE node node-id-1 node-a"
+                                },
+                            }
+                        },
+                    },
+                )
+            )
+            return
+        if len(self.calls) == 2:
+            yield LlmStreamChunk(
+                message=LlmAssistantMessage(
+                    content="Deletion confirmation is required.",
+                    tool_calls=[],
+                    raw_tool_calls=[],
+                )
+            )
+            return
+        raise AssertionError("unexpected extra streaming LLM call")
+
+
 def _assistant_message_with_tool_call(
     *,
     call_id: str,
@@ -312,6 +358,85 @@ def test_ai_chat_stream_reuses_request_id_for_mcp_tool_calls():
         "arguments": {"request": {"status": "down"}},
     }
     assert {call["request_id"] for call in mcp.tool_calls} == {request_id}
+
+
+def test_ai_chat_stream_blocks_confirmation_phrase_missing_from_latest_user_message():
+    app = create_app()
+    store = FakeGatewaySessionStore()
+    collector = FakeCollectorClient()
+    mcp = FakeMcpClient()
+    llm = FakeConfirmationToolLlmClient()
+    session = create_session(
+        store,
+        username="user-a",
+        password=SecretStr("secret"),
+        ttl_seconds=60,
+    )
+    app.dependency_overrides[get_gateway_session_store] = lambda: store
+    app.dependency_overrides[get_collector_client_provider] = lambda: lambda: collector
+    app.dependency_overrides[get_mcp_client_provider] = lambda: lambda: mcp
+    app.dependency_overrides[get_llm_client_provider] = lambda: lambda: llm
+    client = TestClient(app)
+
+    with client.stream(
+        "POST",
+        "/api/v1/ai/chat/stream",
+        headers={"X-OpenSVC-AI-Session": session.session_id},
+        json={"message": "I confirm"},
+    ) as response:
+        body = response.read().decode()
+
+    assert response.status_code == 200
+    assert "event: done" in body
+    assert 'event: tool_call\ndata: {"name": "delete_node", "ok": false}' in body
+    assert "Deletion confirmation is required." in body
+    assert mcp.tool_calls == []
+    tool_message = llm.calls[1]["messages"][-2]
+    assert tool_message["role"] == "tool"
+    assert "state_changing_tool_confirmation_required" in tool_message["content"]
+
+
+def test_ai_chat_stream_allows_confirmation_phrase_in_latest_user_message():
+    app = create_app()
+    store = FakeGatewaySessionStore()
+    collector = FakeCollectorClient()
+    mcp = FakeMcpClient()
+    llm = FakeConfirmationToolLlmClient()
+    session = create_session(
+        store,
+        username="user-a",
+        password=SecretStr("secret"),
+        ttl_seconds=60,
+    )
+    app.dependency_overrides[get_gateway_session_store] = lambda: store
+    app.dependency_overrides[get_collector_client_provider] = lambda: lambda: collector
+    app.dependency_overrides[get_mcp_client_provider] = lambda: lambda: mcp
+    app.dependency_overrides[get_llm_client_provider] = lambda: lambda: llm
+    client = TestClient(app)
+
+    with client.stream(
+        "POST",
+        "/api/v1/ai/chat/stream",
+        headers={"X-OpenSVC-AI-Session": session.session_id},
+        json={"message": "DELETE node node-id-1 node-a"},
+    ) as response:
+        body = response.read().decode()
+
+    assert response.status_code == 200
+    assert "event: done" in body
+    assert 'event: tool_call\ndata: {"name": "delete_node", "ok": true}' in body
+    assert [call["name"] for call in mcp.tool_calls] == ["call_tool"]
+    assert mcp.tool_calls[0]["arguments"] == {
+        "name": "delete_node",
+        "arguments": {
+            "request": {
+                "node_id": "node-id-1",
+                "confirm_node_id": "node-id-1",
+                "confirm_nodename": "node-a",
+                "confirmation": {"phrase": "DELETE node node-id-1 node-a"},
+            }
+        },
+    }
 
 
 def test_ai_chat_stream_rejects_unimplemented_llm_provider():
