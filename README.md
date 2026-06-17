@@ -298,3 +298,11 @@ check; MCP schemas make the field mandatory for write/delete tools.
 ```bash
 ./venv/bin/python -m pytest
 ```
+
+## Project Status
+
+This project is currently in development. Feedback, issues, and contributions are welcome.
+
+For questions or discussion, you can contact me on LinkedIn:
+
+https://fr.linkedin.com/in/hugo-brenet-49b200202
