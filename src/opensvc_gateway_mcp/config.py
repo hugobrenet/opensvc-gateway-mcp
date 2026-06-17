@@ -93,6 +93,15 @@ class Settings(BaseSettings):
             "MCP_REQUEST_TIMEOUT_SECONDS",
         ),
     )
+    mcp_list_tools_cache_ttl_seconds: float | None = Field(
+        default=None,
+        ge=0.0,
+        validation_alias=AliasChoices(
+            "OPENSVC_MCP_LIST_TOOLS_CACHE_TTL_SECONDS",
+            "OPENSVC_GATEWAY_MCP_LIST_TOOLS_CACHE_TTL_SECONDS",
+            "MCP_LIST_TOOLS_CACHE_TTL_SECONDS",
+        ),
+    )
     llm_request_timeout_seconds: float = Field(
         default=60.0,
         validation_alias=AliasChoices(

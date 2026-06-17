@@ -1,6 +1,7 @@
 import asyncio
 import json
 
+from fastapi.security import HTTPBasicCredentials
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -18,8 +19,9 @@ from opensvc_gateway_mcp.clients.llm import (
 )
 from opensvc_gateway_mcp.config import Settings
 from tests.fakes import FakeGatewaySessionStore
+from opensvc_gateway_mcp.core.orchestrator import AiOrchestrator, clear_mcp_list_tools_cache
 from opensvc_gateway_mcp.main import create_app
-from opensvc_gateway_mcp.schemas.ai import LlmProfile
+from opensvc_gateway_mcp.schemas.ai import AiChatRequest, LlmProfile
 
 
 def create_session(store, **kwargs):
@@ -116,6 +118,10 @@ class FakeMcpClient:
                 "isError": False,
             }
         raise AssertionError(f"unexpected MCP tool {name}")
+
+
+class CacheableFakeMcpClient(FakeMcpClient):
+    list_tools_cache_key = "fake-mcp-cache-key"
 
 
 class FakeLlmClient:
@@ -312,6 +318,47 @@ def test_ai_chat_stream_returns_sse_deltas_and_done_event():
     assert llm.calls[0]["stream"] is True
     assert len(mcp.list_request_ids) == 1
     assert mcp.list_request_ids[0].startswith("ai_")
+
+
+def test_ai_orchestrator_caches_mcp_list_tools_between_turns():
+    async def run_test():
+        await clear_mcp_list_tools_cache()
+        collector = FakeCollectorClient()
+        mcp = CacheableFakeMcpClient()
+        credentials = HTTPBasicCredentials(username="user-a", password="secret")
+
+        first_llm = FakeLlmClient()
+        first = AiOrchestrator(
+            collector=collector,
+            mcp_client_provider=lambda: mcp,
+            llm=first_llm,
+            mcp_list_tools_cache_ttl_seconds=60,
+        )
+        async for _event in first.stream_chat(
+            credentials=credentials,
+            request=AiChatRequest(message="hello"),
+        ):
+            pass
+
+        second_llm = FakeLlmClient()
+        second = AiOrchestrator(
+            collector=collector,
+            mcp_client_provider=lambda: mcp,
+            llm=second_llm,
+            mcp_list_tools_cache_ttl_seconds=60,
+        )
+        async for _event in second.stream_chat(
+            credentials=credentials,
+            request=AiChatRequest(message="hello again"),
+        ):
+            pass
+
+        assert len(mcp.list_request_ids) == 1
+        assert mcp.list_request_ids[0].startswith("ai_")
+        assert first_llm.calls[0]["tools"] == second_llm.calls[0]["tools"]
+        await clear_mcp_list_tools_cache()
+
+    asyncio.run(run_test())
 
 
 def test_ai_chat_stream_reuses_request_id_for_mcp_tool_calls():

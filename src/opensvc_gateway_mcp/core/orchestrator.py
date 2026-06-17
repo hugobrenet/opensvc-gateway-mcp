@@ -1,4 +1,7 @@
+import asyncio
+import copy
 import json
+import time
 from collections.abc import Callable
 from typing import Any
 from uuid import uuid4
@@ -18,10 +21,79 @@ from opensvc_gateway_mcp.schemas.ai import (
 
 
 LLM_VISIBLE_MCP_TOOLS = {"search_tools", "call_tool"}
+_MCP_LIST_TOOLS_CACHE = None
 
 
 class AiOrchestrationError(Exception):
     """The gateway could not complete an AI orchestration turn."""
+
+
+class _McpListToolsCache:
+    def __init__(self) -> None:
+        self._values: dict[str, tuple[float, dict[str, Any]]] = {}
+        self._lock = asyncio.Lock()
+
+    async def get_or_fetch(
+        self,
+        *,
+        key: str,
+        ttl_seconds: float,
+        fetch: Callable[[], Any],
+    ) -> tuple[dict[str, Any], bool]:
+        now = time.monotonic()
+        async with self._lock:
+            cached = self._values.get(key)
+            if cached is not None:
+                expires_at, value = cached
+                if expires_at > now:
+                    return copy.deepcopy(value), True
+                self._values.pop(key, None)
+
+        value = await fetch()
+        async with self._lock:
+            self._values[key] = (time.monotonic() + ttl_seconds, copy.deepcopy(value))
+        return value, False
+
+    async def clear(self) -> None:
+        async with self._lock:
+            self._values.clear()
+
+
+async def _list_mcp_tools(
+    mcp: McpClient,
+    credentials: HTTPBasicCredentials,
+    *,
+    request_id: str,
+    cache_ttl_seconds: float,
+) -> tuple[dict[str, Any], bool]:
+    cache_key = getattr(mcp, "list_tools_cache_key", None)
+    if not isinstance(cache_key, str) or not cache_key.strip() or cache_ttl_seconds <= 0:
+        return await mcp.list_tools(credentials, request_id=request_id), False
+
+    global _MCP_LIST_TOOLS_CACHE
+    if _MCP_LIST_TOOLS_CACHE is None:
+        _MCP_LIST_TOOLS_CACHE = _McpListToolsCache()
+
+    async def fetch() -> dict[str, Any]:
+        return await mcp.list_tools(credentials, request_id=request_id)
+
+    return await _MCP_LIST_TOOLS_CACHE.get_or_fetch(
+        key=cache_key.strip(),
+        ttl_seconds=cache_ttl_seconds,
+        fetch=fetch,
+    )
+
+
+async def clear_mcp_list_tools_cache() -> None:
+    if _MCP_LIST_TOOLS_CACHE is not None:
+        await _MCP_LIST_TOOLS_CACHE.clear()
+
+
+def _mcp_list_tools_cache_ttl_seconds(mcp: McpClient, *, default: float) -> float:
+    ttl = getattr(mcp, "list_tools_cache_ttl_seconds", default)
+    if isinstance(ttl, (int, float)):
+        return float(ttl)
+    return default
 
 
 class AiOrchestrator:
@@ -31,10 +103,12 @@ class AiOrchestrator:
         collector: CollectorClient,
         mcp_client_provider: Callable[[], McpClient],
         llm: LlmProviderClient,
+        mcp_list_tools_cache_ttl_seconds: float = 1800.0,
     ) -> None:
         self.collector = collector
         self.mcp_client_provider = mcp_client_provider
         self.llm = llm
+        self.mcp_list_tools_cache_ttl_seconds = mcp_list_tools_cache_ttl_seconds
 
     async def stream_chat(
         self,
@@ -45,7 +119,15 @@ class AiOrchestrator:
         request_id = _new_ai_request_id()
         profile = await self.collector.get_ai_config(credentials)
         mcp = self.mcp_client_provider()
-        tools_result = await mcp.list_tools(credentials, request_id=request_id)
+        tools_result, _list_tools_cache_hit = await _list_mcp_tools(
+            mcp,
+            credentials,
+            request_id=request_id,
+            cache_ttl_seconds=_mcp_list_tools_cache_ttl_seconds(
+                mcp,
+                default=self.mcp_list_tools_cache_ttl_seconds,
+            ),
+        )
         tools = _mcp_tools_to_openai_tools(
             tools_result,
             allowed_names=LLM_VISIBLE_MCP_TOOLS,

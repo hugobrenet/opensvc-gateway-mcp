@@ -76,6 +76,16 @@ class McpClient:
         self.settings = settings
         self._client_factory = client_factory or self._build_fastmcp_client
 
+    @property
+    def list_tools_cache_key(self) -> str:
+        return self.settings.mcp_url.rstrip("/")
+
+    @property
+    def list_tools_cache_ttl_seconds(self) -> float:
+        if self.settings.mcp_list_tools_cache_ttl_seconds is not None:
+            return self.settings.mcp_list_tools_cache_ttl_seconds
+        return float(self.settings.gateway_session_ttl_seconds)
+
     async def list_tools(
         self,
         credentials: HTTPBasicCredentials,
