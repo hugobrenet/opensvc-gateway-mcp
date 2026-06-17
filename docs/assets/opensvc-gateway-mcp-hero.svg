@@ -1,0 +1,213 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">OpenSVC Gateway MCP animated architecture</title>
+  <desc id="desc">Animated architecture hero showing the OpenSVC AI Gateway orchestrating LLM requests and MCP tool calls between the Collector UI, LLM provider, Collector MCP, and Collector API.</desc>
+
+  <defs>
+    <radialGradient id="backgroundGlow" cx="50%" cy="46%" r="68%">
+      <stop offset="0%" stop-color="#17315a"/>
+      <stop offset="48%" stop-color="#0b1628"/>
+      <stop offset="100%" stop-color="#050816"/>
+    </radialGradient>
+
+    <radialGradient id="gatewayGlow" cx="50%" cy="50%" r="56%">
+      <stop offset="0%" stop-color="#93c5fd" stop-opacity="0.92"/>
+      <stop offset="42%" stop-color="#22d3ee" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="gatewayFill" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="46%" stop-color="#155e75"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+
+    <linearGradient id="collectorFill" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+
+    <linearGradient id="llmFill" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#3730a3"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+
+    <linearGradient id="mcpFill" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#0f766e"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+
+    <linearGradient id="redisFill" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#7f1d1d"/>
+      <stop offset="100%" stop-color="#be123c"/>
+    </linearGradient>
+
+    <linearGradient id="secureLine" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0"/>
+      <stop offset="45%" stop-color="#67e8f9" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#a7f3d0" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="llmLine" x1="0%" x2="100%">
+      <stop offset="0%" stop-color="#c4b5fd" stop-opacity="0"/>
+      <stop offset="45%" stop-color="#93c5fd" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#67e8f9" stop-opacity="0"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="-25%" y="-30%" width="150%" height="170%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#020617" flood-opacity="0.5"/>
+    </filter>
+
+    <filter id="neon">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#94a3b8" stroke-width="1" opacity="0.07"/>
+    </pattern>
+
+    <path id="uiToGatewayPath" d="M360 338 C508 278 616 300 714 388"/>
+    <path id="gatewayToLlmPath" d="M854 360 C945 245 1048 236 1182 318"/>
+    <path id="gatewayToMcpPath" d="M890 482 C1005 440 1118 456 1246 548"/>
+    <path id="mcpToRestPath" d="M1246 604 C1048 720 596 720 312 604"/>
+    <path id="gatewayToRedisPath" d="M744 548 C615 590 545 565 444 506"/>
+
+    <style>
+      .title { font: 700 42px Arial, Helvetica, sans-serif; letter-spacing: 0; fill: #f8fafc; }
+      .subtitle { font: 400 20px Arial, Helvetica, sans-serif; letter-spacing: 0; fill: #cbd5e1; }
+      .label { font: 700 21px Arial, Helvetica, sans-serif; letter-spacing: 0; fill: #f8fafc; }
+      .small { font: 400 15px Arial, Helvetica, sans-serif; letter-spacing: 0; fill: #cbd5e1; }
+      .micro { font: 700 13px Arial, Helvetica, sans-serif; letter-spacing: 0; fill: #dbeafe; }
+      .terminal { font: 700 14px "SFMono-Regular", Consolas, "Liberation Mono", monospace; letter-spacing: 0; fill: #a7f3d0; }
+      .flow { fill: none; stroke: url(#secureLine); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 8 16; animation: dash 3.4s linear infinite; }
+      .flow.llm { stroke: url(#llmLine); animation-duration: 3.8s; }
+      .ring { fill: none; stroke: #67e8f9; stroke-width: 2; stroke-opacity: 0.48; transform-origin: 800px 468px; animation: rotate 18s linear infinite; }
+      .ring.reverse { stroke: #a7f3d0; stroke-dasharray: 14 18; animation-direction: reverse; animation-duration: 24s; }
+      .pulse { animation: pulse 2.8s ease-in-out infinite; transform-origin: center; }
+      .scan { animation: scan 3.2s ease-in-out infinite; }
+      .chip { animation: glow 6s ease-in-out infinite; }
+      .delay-1 { animation-delay: 0.4s; }
+      .delay-2 { animation-delay: 0.8s; }
+      .delay-3 { animation-delay: 1.2s; }
+      .delay-4 { animation-delay: 1.6s; }
+      .delay-5 { animation-delay: 2.0s; }
+      @keyframes dash { to { stroke-dashoffset: -96; } }
+      @keyframes rotate { to { transform: rotate(360deg); } }
+      @keyframes pulse { 0%, 100% { opacity: 0.58; transform: scale(1); } 50% { opacity: 1; transform: scale(1.035); } }
+      @keyframes scan { 0%, 100% { transform: translateY(-44px); opacity: 0; } 18%, 72% { opacity: 0.78; } 50% { transform: translateY(48px); opacity: 0.95; } }
+      @keyframes glow { 0%, 100% { opacity: 0.68; } 45%, 55% { opacity: 1; filter: drop-shadow(0 0 8px #22d3ee); } }
+      @media (prefers-reduced-motion: reduce) { .flow, .ring, .pulse, .scan, .chip { animation: none; } }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#backgroundGlow)"/>
+  <rect width="1600" height="900" fill="url(#grid)"/>
+
+  <g opacity="0.36">
+    <circle cx="152" cy="158" r="2" fill="#bfdbfe"/>
+    <circle cx="294" cy="716" r="2" fill="#67e8f9"/>
+    <circle cx="512" cy="126" r="1.8" fill="#a7f3d0"/>
+    <circle cx="1052" cy="124" r="2" fill="#bfdbfe"/>
+    <circle cx="1410" cy="744" r="2.2" fill="#67e8f9"/>
+    <circle cx="1352" cy="184" r="1.8" fill="#a7f3d0"/>
+    <circle cx="754" cy="778" r="2" fill="#bfdbfe"/>
+  </g>
+
+  <text x="92" y="88" class="title">OpenSVC Gateway MCP</text>
+  <text x="92" y="124" class="subtitle">Session-aware AI gateway that keeps credentials server-side and brokers safe MCP tool execution.</text>
+
+  <g transform="translate(92 252)" filter="url(#softShadow)">
+    <rect width="286" height="164" rx="22" fill="url(#collectorFill)" stroke="#86efac" stroke-opacity="0.36"/>
+    <circle cx="54" cy="55" r="27" fill="#ffffff" opacity="0.12"/>
+    <rect x="37" y="38" width="34" height="34" rx="8" fill="#dcfce7"/>
+    <path d="M45 51h18M45 62h13" stroke="#047857" stroke-width="4" stroke-linecap="round"/>
+    <text x="96" y="52" class="label">Collector UI</text>
+    <text x="96" y="82" class="small">Session and chat</text>
+    <rect x="24" y="108" width="236" height="34" rx="12" fill="#020617" opacity="0.38"/>
+    <text x="39" y="130" class="terminal">X-OpenSVC-AI-Session</text>
+  </g>
+
+  <g transform="translate(92 506)" filter="url(#softShadow)">
+    <rect width="286" height="130" rx="22" fill="url(#collectorFill)" stroke="#86efac" stroke-opacity="0.32"/>
+    <text x="30" y="48" class="label">Collector REST</text>
+    <text x="30" y="77" class="small">Final data and write authority</text>
+    <text x="30" y="108" class="terminal">/init/rest/api</text>
+  </g>
+
+  <g transform="translate(1188 246)" filter="url(#softShadow)">
+    <rect width="300" height="156" rx="22" fill="url(#llmFill)" stroke="#c4b5fd" stroke-opacity="0.36"/>
+    <circle cx="54" cy="54" r="27" fill="#ffffff" opacity="0.12"/>
+    <path d="M39 58c6-22 34-25 44-5 9 18-7 34-24 34H45c-11-6-15-18-6-29z" fill="#e0f2fe" opacity="0.95"/>
+    <text x="96" y="52" class="label">LLM Provider</text>
+    <text x="96" y="82" class="small">Streaming tool decisions</text>
+  </g>
+
+  <g transform="translate(1190 514)" filter="url(#softShadow)">
+    <rect width="298" height="158" rx="22" fill="url(#mcpFill)" stroke="#67e8f9" stroke-opacity="0.35"/>
+    <text x="30" y="50" class="label">Collector MCP</text>
+    <text x="30" y="80" class="small">search_tools + call_tool</text>
+    <rect x="24" y="108" width="118" height="30" rx="11" fill="#020617" opacity="0.38"/>
+    <text x="39" y="128" class="terminal">POST /mcp</text>
+    <rect x="156" y="108" width="118" height="30" rx="11" fill="#020617" opacity="0.46" class="chip delay-2"/>
+    <text x="215" y="128" text-anchor="middle" class="micro">MCP RBAC</text>
+  </g>
+
+  <g transform="translate(412 432)" filter="url(#softShadow)">
+    <rect width="250" height="130" rx="22" fill="url(#redisFill)" stroke="#fda4af" stroke-opacity="0.34"/>
+    <text x="30" y="48" class="label">Redis Session</text>
+    <text x="30" y="78" class="small">short-lived credentials</text>
+    <text x="30" y="108" class="terminal">SETEX session:&lt;id&gt;</text>
+  </g>
+
+  <path class="flow" d="M360 338 C508 278 616 300 714 388"/>
+  <path class="flow llm" d="M854 360 C945 245 1048 236 1182 318"/>
+  <path class="flow" d="M890 482 C1005 440 1118 456 1246 548"/>
+  <path class="flow" d="M1246 604 C1048 720 596 720 312 604"/>
+  <path class="flow" d="M744 548 C615 590 545 565 444 506"/>
+
+  <circle r="7" fill="#7dd3fc" filter="url(#neon)">
+    <animateMotion dur="3.6s" repeatCount="indefinite"><mpath href="#uiToGatewayPath"/></animateMotion>
+  </circle>
+  <circle r="7" fill="#c4b5fd" filter="url(#neon)">
+    <animateMotion dur="3.9s" begin="0.35s" repeatCount="indefinite"><mpath href="#gatewayToLlmPath"/></animateMotion>
+  </circle>
+  <circle r="7" fill="#67e8f9" filter="url(#neon)">
+    <animateMotion dur="3.8s" begin="0.7s" repeatCount="indefinite"><mpath href="#gatewayToMcpPath"/></animateMotion>
+  </circle>
+  <circle r="7" fill="#a7f3d0" filter="url(#neon)">
+    <animateMotion dur="4.2s" begin="1.05s" repeatCount="indefinite"><mpath href="#mcpToRestPath"/></animateMotion>
+  </circle>
+  <circle r="6" fill="#fda4af" filter="url(#neon)">
+    <animateMotion dur="4.4s" begin="1.3s" repeatCount="indefinite"><mpath href="#gatewayToRedisPath"/></animateMotion>
+  </circle>
+
+  <g transform="translate(800 468)" filter="url(#softShadow)">
+    <circle r="170" fill="url(#gatewayGlow)" opacity="0.52"/>
+    <circle r="128" fill="url(#gatewayFill)" stroke="#67e8f9" stroke-opacity="0.62" stroke-width="2"/>
+    <circle class="ring" r="154"/>
+    <circle class="ring reverse" r="176"/>
+
+    <path d="M-50-18c0-38 100-38 100 0v24c0 48-32 76-50 84-18-8-50-36-50-84z" fill="#e0f2fe" opacity="0.95"/>
+    <path d="M-23-8v-20c0-31 46-31 46 0v20" fill="none" stroke="#0f172a" stroke-width="12" stroke-linecap="round"/>
+    <rect x="-44" y="-10" width="88" height="64" rx="18" fill="#0f172a" opacity="0.96"/>
+    <circle cx="0" cy="20" r="8" fill="#67e8f9"/>
+    <path d="M0 28v14" stroke="#67e8f9" stroke-width="5" stroke-linecap="round"/>
+
+    <text x="0" y="105" text-anchor="middle" class="label">AI Gateway</text>
+    <text x="0" y="142" text-anchor="middle" class="small">Orchestrates LLM and MCP tools</text>
+
+    <rect x="-118" y="-72" width="236" height="8" rx="4" fill="#67e8f9" opacity="0.12"/>
+    <rect class="scan" x="-118" y="-72" width="236" height="8" rx="4" fill="#67e8f9" opacity="0.7"/>
+  </g>
+
+  <g transform="translate(92 780)">
+    <rect width="1416" height="52" rx="18" fill="#020617" opacity="0.42" stroke="#334155" stroke-opacity="0.32"/>
+    <text x="28" y="33" class="micro">Credentials stay server-side</text>
+    <text x="292" y="33" class="micro">MCP exposes only proxy tools to the LLM</text>
+    <text x="676" y="33" class="micro">State-changing calls require latest-message confirmation</text>
+    <text x="1120" y="33" class="micro">Collector remains final authority</text>
+  </g>
+</svg>

@@ -1,10 +1,23 @@
 # opensvc-gateway-mcp
 
+<p align="center">
+  <img src="docs/assets/opensvc-gateway-mcp-hero.svg" alt="OpenSVC Gateway MCP architecture animation" width="100%">
+</p>
+
 FastAPI gateway for securing access to the OpenSVC Collector MCP server.
 
 The gateway is intended to sit between OpenSVC-facing clients and the
 `opensvc-collector-mcp` service. Its first responsibility is to centralize access
 control before MCP calls are made.
+
+## OpenSVC References
+
+This project targets OpenSVC Collector deployments and uses the Collector REST
+API as its source of truth. For upstream OpenSVC concepts and Collector
+behavior, refer to the official resources:
+
+- OpenSVC website: https://www.opensvc.com/
+- OpenSVC documentation: https://docs.opensvc.com/latest/
 
 
 ## FastAPI
