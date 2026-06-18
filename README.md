@@ -5,6 +5,7 @@
 </p>
 
 FastAPI gateway for securing access to the OpenSVC Collector MCP server.
+- OpenSVC Collector MCP server: https://github.com/hugobrenet/opensvc-collector-mcp
 
 The gateway is intended to sit between OpenSVC-facing clients and the
 `opensvc-collector-mcp` service. Its first responsibility is to centralize access
